@@ -1,6 +1,6 @@
 import re
-from pydantic import BaseModel, EmailStr, Field, field_validator, ValidationError
-from typing import Any
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from app.utils.validator import validate_field
 
 
 class UserCreate(BaseModel):
@@ -8,21 +8,9 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=8, max_length=20)
     name: str = Field(..., min_length=2, max_length=50)
 
-    @staticmethod
-    def validate_field(validators: list[callable], value):
-        errors = []
-        for validator in validators:
-            try:
-                value = validator(value)
-            except ValueError as e:
-                errors.append(str(e))
-        if errors:
-            raise ValueError(errors)
-        return value
-
     @field_validator("password")
     def validate_password(cls, value: str) -> str:
-        return cls.validate_field(
+        return validate_field(
             [lambda x: x.strip(), cls.password_complexity], value  # 공백 제거
         )
 
@@ -40,7 +28,7 @@ class UserCreate(BaseModel):
 
     @field_validator("name")
     def validate_name(cls, value: str) -> str:
-        return cls.validate_field(
+        return validate_field(
             [cls.name_characters, lambda x: " ".join(x.split())],
             value,  # 중간 공백 압축
         )
