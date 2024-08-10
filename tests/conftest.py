@@ -25,15 +25,16 @@ def db_engine():
 
 @pytest.fixture(scope="function")
 def db_session(db_engine):
-    connection = db_engine.connect()
+    connection = test_engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
 
-    yield session
-
-    session.close()
-    transaction.rollback()
-    connection.close()
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
 
 
 @pytest.fixture(scope="function")
@@ -45,7 +46,7 @@ def client(db_session):
         try:
             yield db_session
         finally:
-            db_session.close()
+            pass  # 여기서 session을 닫지 않습니다.
 
     app.dependency_overrides[get_db] = override_get_db
 
