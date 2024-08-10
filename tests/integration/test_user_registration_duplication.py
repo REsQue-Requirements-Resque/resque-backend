@@ -1,5 +1,4 @@
 import pytest
-from sqlalchemy.exc import IntegrityError
 from app.schemas.users import UserCreate
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -32,7 +31,7 @@ class TestUserRegistrationDuplication:
         }
 
     @pytest.fixture(autouse=True)
-    def setup_method(self, db_session):
+    def setup(self, db_session):
         self.user_repository = UserRepository(db_session)
         existing_user = User(
             email=self.emails["existing"],
@@ -42,15 +41,15 @@ class TestUserRegistrationDuplication:
         db_session.add(existing_user)
         db_session.commit()
 
-    def test_register_user_with_unique_email(self, db_session):
+    def test_register_user_with_unique_email(self):
         data = self.get_valid_data()
         user = self.user_repository.create_user(UserCreate(**data))
 
         assert user is not None
         assert user.email == data["email"]
-        assert db_session.query(User).filter_by(email=data["email"]).first() is not None
+        assert self.user_repository.get_user_by_email(data["email"]) is not None
 
-    def test_register_user_with_duplicate_email(self, db_session):
+    def test_register_user_with_duplicate_email(self):
         data = self.get_valid_data()
         data["email"] = self.emails["existing"]
 
@@ -59,7 +58,7 @@ class TestUserRegistrationDuplication:
 
         assert str(exc_info.value) == "Email already exists"
 
-    def test_register_user_with_case_insensitive_duplicate_email(self, db_session):
+    def test_register_user_with_case_insensitive_duplicate_email(self):
         data = self.get_valid_data()
         data["email"] = self.emails["case_insensitive"]
 
@@ -68,16 +67,17 @@ class TestUserRegistrationDuplication:
 
         assert str(exc_info.value) == "Email already exists"
 
-    def test_database_error_during_duplication_check(self, db_session):
+    def test_database_error_during_user_creation(self, mocker):
         data = self.get_valid_data()
-        # Simulate database error by trying to insert a duplicate email
-        data["email"] = self.emails["existing"]
+
+        # Mock the database session to raise an exception
+        mocker.patch.object(
+            self.user_repository,
+            "_create_user",
+            side_effect=Exception("Database error"),
+        )
 
         with pytest.raises(DatabaseError) as exc_info:
-            try:
-                self.user_repository.create_user(UserCreate(**data))
-            except IntegrityError:
-                # Assuming UserRepository catches IntegrityError and raises DatabaseError
-                raise DatabaseError("An error occurred while accessing the database")
+            self.user_repository.create_user(UserCreate(**data))
 
         assert str(exc_info.value) == "An error occurred while accessing the database"
