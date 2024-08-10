@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "FastAPI Project"
     API_V1_STR: str = "/api/v1"
     DATABASE_URL: str = "sqlite:///./sql_app.db"
+    WELCOME_MESSAGE: str = "Hello, World!"
 
     model_config = SettingsConfigDict(env_file=".env")
 
