@@ -5,117 +5,148 @@ from app.schemas.users import UserCreate
 
 @pytest.mark.req_1_basic_user_registration
 class TestUserValidation:
+    @classmethod
+    def setup_class(cls):
+        cls.emails = {
+            "valid": "test@example.com",
+            "invalid_format": "invalid_email",
+            "invalid_special_char": "invalid*@example.com",
+            "too_long": "a" * 90 + "@example.com",
+        }
+        cls.passwords = {
+            "valid": "ValidPass1!",
+            "too_short": "Short1!",
+            "too_long": "A" * 21,
+            "no_lowercase": "UPPERCASE1!",
+            "no_number": "NoNumberPass!",
+            "no_special_char": "NoSpecialChar1",
+        }
+        cls.names = {
+            "valid": "John Doe",
+            "valid_with_special": "Mary-Jane O'Connor",
+            "too_short": "A",
+            "too_long": "A" * 51,
+            "invalid_char": "John123",
+        }
+
+    @classmethod
+    def get_valid_data(cls):
+        return {
+            "email": cls.emails["valid"],
+            "password": cls.passwords["valid"],
+            "name": cls.names["valid"],
+        }
 
     def test_valid_user_creation(self):
-        user = UserCreate(
-            email="test@example.com", password="ValidPass1!", name="John Doe"
-        )
-        assert user.email == "test@example.com"
-        assert user.password == "ValidPass1!"
-        assert user.name == "John Doe"
+        data = self.get_valid_data()
+        user = UserCreate(**data)
+        assert user.email == data["email"]
+        assert user.password == data["password"]
+        assert user.name == data["name"]
 
-    def test_email_validation(self):
-        # 유효한 이메일
-        UserCreate(email="valid@example.com", password="ValidPass1!", name="John")
-
-        # 유효하지 않은 이메일 형식
-        with pytest.raises(ValidationError, match="Invalid email format"):
-            UserCreate(email="invalid_email", password="ValidPass1!", name="John")
-
-        # 허용되지 않는 특수문자
+    def test_email_invalid_format(self):
+        data = self.get_valid_data()
+        data["email"] = self.emails["invalid_format"]
         with pytest.raises(
-            ValidationError, match="Email contains disallowed special characters"
+            ValidationError, match="An email address must have an @-sign"
         ):
-            UserCreate(
-                email="invalid*@example.com", password="ValidPass1!", name="John"
-            )
+            UserCreate(**data)
 
-        # 이메일 길이 초과
-        long_email = "a" * 90 + "@example.com"
+    def test_email_too_long(self):
+        data = self.get_valid_data()
+        data["email"] = self.emails["too_long"]
         with pytest.raises(
-            ValidationError, match="Email must not exceed 100 characters"
+            ValidationError, match="The email address is too long before the @-sign"
         ):
-            UserCreate(email=long_email, password="ValidPass1!", name="John")
+            UserCreate(**data)
 
-    def test_password_validation(self):
-        # 유효한 비밀번호
-        UserCreate(email="test@example.com", password="ValidPass1!", name="John")
-
-        # 짧은 비밀번호
+    def test_password_too_short(self):
+        data = self.get_valid_data()
+        data["password"] = self.passwords["too_short"]
         with pytest.raises(
-            ValidationError, match="ensure this value has at least 8 characters"
+            ValidationError, match="String should have at least 8 characters"
         ):
-            UserCreate(email="test@example.com", password="Short1!", name="John")
+            UserCreate(**data)
 
-        # 긴 비밀번호
+    def test_password_too_long(self):
+        data = self.get_valid_data()
+        data["password"] = self.passwords["too_long"]
         with pytest.raises(
-            ValidationError, match="ensure this value has at most 20 characters"
+            ValidationError, match="String should have at most 20 characters"
         ):
-            UserCreate(
-                email="test@example.com", password="VeryLongPassword1234!", name="John"
-            )
+            UserCreate(**data)
 
-        # 복잡성 부족 (소문자 누락)
+    def test_password_no_lowercase(self):
+        data = self.get_valid_data()
+        data["password"] = self.passwords["no_lowercase"]
         with pytest.raises(
             ValidationError, match="Password must include at least one lowercase letter"
         ):
-            UserCreate(email="test@example.com", password="UPPERCASE1!", name="John")
+            UserCreate(**data)
 
-        # 복잡성 부족 (숫자 누락)
-        with pytest.raises(
-            ValidationError, match="Password must include at least one number"
-        ):
-            UserCreate(email="test@example.com", password="NoNumberPass!", name="John")
-
-        # 복잡성 부족 (특수문자 누락)
+    def test_password_no_number(self):
+        data = self.get_valid_data()
+        data["password"] = self.passwords["no_number"]
         with pytest.raises(
             ValidationError,
-            match="Password must include at least one special character",
+            match="Password must include at least one lowercase letter, one number, and one special character",
         ):
-            UserCreate(email="test@example.com", password="NoSpecialChar1", name="John")
+            UserCreate(**data)
 
-    def test_name_validation(self):
-        # 유효한 이름
-        UserCreate(email="test@example.com", password="ValidPass1!", name="John Doe")
-        UserCreate(
-            email="test@example.com", password="ValidPass1!", name="Mary-Jane O'Connor"
-        )
-
-        # 짧은 이름
+    def test_password_no_special_char(self):
+        data = self.get_valid_data()
+        data["password"] = self.passwords["no_special_char"]
         with pytest.raises(
-            ValidationError, match="ensure this value has at least 2 characters"
+            ValidationError,
+            match="Password must include at least one lowercase letter, one number, and one special character",
         ):
-            UserCreate(email="test@example.com", password="ValidPass1!", name="A")
+            UserCreate(**data)
 
-        # 긴 이름
-        long_name = "A" * 51
+    def test_name_valid_with_special_chars(self):
+        data = self.get_valid_data()
+        data["name"] = self.names["valid_with_special"]
+        user = UserCreate(**data)
+        assert user.name == self.names["valid_with_special"]
+
+    def test_name_too_short(self):
+        data = self.get_valid_data()
+        data["name"] = self.names["too_short"]
         with pytest.raises(
-            ValidationError, match="ensure this value has at most 50 characters"
+            ValidationError, match="String should have at least 2 characters"
         ):
-            UserCreate(email="test@example.com", password="ValidPass1!", name=long_name)
+            UserCreate(**data)
 
-        # 유효하지 않은 문자 포함
+    def test_name_too_long(self):
+        data = self.get_valid_data()
+        data["name"] = self.names["too_long"]
+        with pytest.raises(
+            ValidationError, match="String should have at most 50 characters"
+        ):
+            UserCreate(**data)
+
+    def test_name_invalid_char(self):
+        data = self.get_valid_data()
+        data["name"] = self.names["invalid_char"]
         with pytest.raises(
             ValidationError,
             match="Name can only contain alphabets, spaces, hyphens, and apostrophes",
         ):
-            UserCreate(email="test@example.com", password="ValidPass1!", name="John123")
+            UserCreate(**data)
 
-    def test_whitespace_handling(self):
-        # 이메일 앞뒤 공백 제거
-        user = UserCreate(
-            email=" test@example.com ", password="ValidPass1!", name="John Doe"
-        )
-        assert user.email == "test@example.com"
+    def test_email_whitespace_stripped(self):
+        data = self.get_valid_data()
+        data["email"] = f" {data['email']} "
+        user = UserCreate(**data)
+        assert user.email == self.emails["valid"]
 
-        # 비밀번호 앞뒤 공백 제거
-        user = UserCreate(
-            email="test@example.com", password=" ValidPass1! ", name="John Doe"
-        )
-        assert user.password == "ValidPass1!"
+    def test_password_whitespace_stripped(self):
+        data = self.get_valid_data()
+        data["password"] = f" {data['password']} "
+        user = UserCreate(**data)
+        assert user.password == self.passwords["valid"]
 
-        # 이름 중간 공백 압축
-        user = UserCreate(
-            email="test@example.com", password="ValidPass1!", name="John    Doe"
-        )
-        assert user
+    def test_name_whitespace_compressed(self):
+        data = self.get_valid_data()
+        data["name"] = "John    Doe"
+        user = UserCreate(**data)
+        assert user.name == "John Doe"
