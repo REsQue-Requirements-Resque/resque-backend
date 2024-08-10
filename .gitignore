@@ -180,3 +180,5 @@ __pycache__
 .env
 .venv
 *.db
+
+/.vscode
