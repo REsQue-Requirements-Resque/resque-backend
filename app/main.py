@@ -7,7 +7,7 @@ app = FastAPI(title=settings.PROJECT_NAME)
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"message": "Hello World"}
 
 
 if __name__ == "__main__":
