@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 from app.schemas.users import UserCreate
 
-
+@pytest.mark.unit
 @pytest.mark.req_1_basic_user_registration
 class TestUserValidation:
     @classmethod
