@@ -32,7 +32,7 @@ jobs:
       id: parse-branch
       run: |
         branch_name="${{ github.head_ref }}"
-        parsed_name=$(echo $branch_name | sed 's/^[^:]*: *//' | tr '[:upper:] ' '[:lower:]_' | sed 's/[^a-z0-9_]//g')
+        parsed_name=$(echo $branch_name | sed -E 's/^req-#([0-9]+)-(.*)$/req_\1_\2/' | tr '[:upper:]-' '[:lower:]_')
         echo "PARSED_BRANCH_NAME=$parsed_name" >> $GITHUB_ENV
 
     - name: Run pytest
