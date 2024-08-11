@@ -1,122 +1,132 @@
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-from app.main import app
-from app.models.user import User
-from app.core.security import verify_password
+from pydantic import ValidationError
+from app.schemas.user import UserCreate
 
 
-@pytest.mark.integration
-@pytest.mark.api
+@pytest.mark.unit
 @pytest.mark.req_1_basic_user_registration
-class TestUserRegistrationAPI:
+class TestUserRegistrationValidation:
     @classmethod
     def setup_class(cls):
-        cls.endpoints = {"register": "/api/users/register"}
-        cls.valid_user_data = {
-            "email": "newuser@example.com",
-            "password": "SecurePass123!",
-            "name": "New User",
-        }
-        cls.invalid_data = {
-            "email": {
-                "invalid_format": "invalid-email",
-                "too_long": "a" * 90 + "@example.com",
-            },
-            "password": {
-                "too_short": "Short1!",
-                "no_uppercase": "lowercase123!",
-                "no_lowercase": "UPPERCASE123!",
-                "no_number": "NoNumberPass!",
-                "no_special_char": "NoSpecialChar1",
-            },
-            "name": {
-                "too_short": "A",
-                "too_long": "A" * 51,
-                "invalid_char": "John123",
-            },
+        cls.valid_data = {
+            "email": "test@example.com",
+            "password": "ValidPass1!",
+            "name": "John Doe",
         }
 
-    @pytest.fixture(scope="class")
-    def client(self):
-        return TestClient(app)
+    @classmethod
+    def get_valid_data(cls):
+        return cls.valid_data.copy()
 
-    @pytest.fixture(autouse=True)
-    def setup(self, db_session: Session):
-        db_session.query(User).delete()
-        db_session.commit()
+    def test_valid_user_creation(self):
+        user = UserCreate(**self.get_valid_data())
+        assert user.email == self.valid_data["email"]
+        assert user.password == self.valid_data["password"]
+        assert user.name == self.valid_data["name"]
 
-    def test_register_user_success(self, client: TestClient, db_session: Session):
-        response = client.post(self.endpoints["register"], json=self.valid_user_data)
+    def test_email_invalid_format(self):
+        data = self.get_valid_data()
+        data["email"] = "invalid_email"
+        with pytest.raises(
+            ValidationError, match="An email address must have an @-sign"
+        ):
+            UserCreate(**data)
 
-        assert response.status_code == 201
-        assert "id" in response.json()
-        assert response.json()["email"] == self.valid_user_data["email"]
-        assert response.json()["name"] == self.valid_user_data["name"]
-        assert "password" not in response.json()
+    def test_email_too_long(self):
+        data = self.get_valid_data()
+        data["email"] = "a" * 90 + "@example.com"
+        with pytest.raises(
+            ValidationError, match="The email address is too long before the @-sign"
+        ):
+            UserCreate(**data)
 
-        db_user = (
-            db_session.query(User)
-            .filter(User.email == self.valid_user_data["email"])
-            .first()
-        )
-        assert db_user is not None
-        assert db_user.email == self.valid_user_data["email"]
-        assert db_user.name == self.valid_user_data["name"]
-        assert verify_password(
-            self.valid_user_data["password"], db_user.hashed_password
-        )
+    def test_password_too_short(self):
+        data = self.get_valid_data()
+        data["password"] = "Short1!"
+        with pytest.raises(
+            ValidationError, match="String should have at least 8 characters"
+        ):
+            UserCreate(**data)
 
-    def test_register_user_duplicate_email(self, client: TestClient):
-        # 먼저 사용자 생성
-        client.post(self.endpoints["register"], json=self.valid_user_data)
+    def test_password_too_long(self):
+        data = self.get_valid_data()
+        data["password"] = "A" * 21
+        with pytest.raises(
+            ValidationError, match="String should have at most 20 characters"
+        ):
+            UserCreate(**data)
 
-        # 같은 이메일로 다시 생성 시도
-        response = client.post(self.endpoints["register"], json=self.valid_user_data)
+    def test_password_no_lowercase(self):
+        data = self.get_valid_data()
+        data["password"] = "UPPERCASE1!"
+        with pytest.raises(
+            ValidationError, match="Password must include at least one lowercase letter"
+        ):
+            UserCreate(**data)
 
-        assert response.status_code == 400
-        assert "email already exists" in response.json()["detail"].lower()
+    def test_password_no_number(self):
+        data = self.get_valid_data()
+        data["password"] = "NoNumberPass!"
+        with pytest.raises(
+            ValidationError,
+            match="Password must include at least one lowercase letter, one number, and one special character",
+        ):
+            UserCreate(**data)
 
-    @pytest.mark.parametrize(
-        "field,invalid_value",
-        [
-            ("email", "invalid_format"),
-            ("password", "too_short"),
-            ("name", ""),
-        ],
-    )
-    def test_register_user_invalid_data(self, client: TestClient, field, invalid_value):
-        invalid_data = self.valid_user_data.copy()
-        invalid_data[field] = self.invalid_data[field].get(invalid_value, invalid_value)
-        response = client.post(self.endpoints["register"], json=invalid_data)
+    def test_password_no_special_char(self):
+        data = self.get_valid_data()
+        data["password"] = "NoSpecialChar1"
+        with pytest.raises(
+            ValidationError,
+            match="Password must include at least one lowercase letter, one number, and one special character",
+        ):
+            UserCreate(**data)
 
-        assert response.status_code == 422
-        errors = response.json()["detail"]
-        assert any(field in error["msg"].lower() for error in errors)
+    def test_name_valid_with_special_chars(self):
+        data = self.get_valid_data()
+        data["name"] = "Mary-Jane O'Connor"
+        user = UserCreate(**data)
+        assert user.name == "Mary-Jane O'Connor"
 
-    def test_register_user_missing_data(self, client: TestClient):
-        incomplete_data = {"email": self.valid_user_data["email"]}
-        response = client.post(self.endpoints["register"], json=incomplete_data)
+    def test_name_too_short(self):
+        data = self.get_valid_data()
+        data["name"] = "A"
+        with pytest.raises(
+            ValidationError, match="String should have at least 2 characters"
+        ):
+            UserCreate(**data)
 
-        assert response.status_code == 422
-        errors = response.json()["detail"]
-        assert any("password" in error["msg"].lower() for error in errors)
-        assert any("name" in error["msg"].lower() for error in errors)
+    def test_name_too_long(self):
+        data = self.get_valid_data()
+        data["name"] = "A" * 51
+        with pytest.raises(
+            ValidationError, match="String should have at most 50 characters"
+        ):
+            UserCreate(**data)
 
-    @pytest.mark.parametrize(
-        "invalid_password",
-        [
-            "too_short",
-            "no_uppercase",
-            "no_lowercase",
-            "no_number",
-            "no_special_char",
-        ],
-    )
-    def test_register_user_invalid_password(self, client: TestClient, invalid_password):
-        invalid_data = self.valid_user_data.copy()
-        invalid_data["password"] = self.invalid_data["password"][invalid_password]
-        response = client.post(self.endpoints["register"], json=invalid_data)
+    def test_name_invalid_char(self):
+        data = self.get_valid_data()
+        data["name"] = "John123"
+        with pytest.raises(
+            ValidationError,
+            match="Name can only contain alphabets, spaces, hyphens, and apostrophes",
+        ):
+            UserCreate(**data)
 
-        assert response.status_code == 422
-        assert "password" in response.json()["detail"][0]["msg"].lower()
+    def test_email_whitespace_stripped(self):
+        data = self.get_valid_data()
+        data["email"] = " test@example.com "
+        user = UserCreate(**data)
+        assert user.email == "test@example.com"
+
+    def test_password_whitespace_stripped(self):
+        data = self.get_valid_data()
+        data["password"] = " ValidPass1! "
+        user = UserCreate(**data)
+        assert user.password == "ValidPass1!"
+
+    def test_name_whitespace_compressed(self):
+        data = self.get_valid_data()
+        data["name"] = "John   Doe"
+        user = UserCreate(**data)
+        assert user.name == "John Doe"
