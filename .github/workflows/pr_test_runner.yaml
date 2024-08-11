@@ -42,7 +42,7 @@ jobs:
     - name: Run pytest
       id: pytest
       run: |
-        pytest_output=$(pytest -v -m ${{ env.PARSED_BRANCH_NAME }})
+        pytest_output=$(pytest -m ${{ env.PARSED_BRANCH_NAME }})
         echo "PYTEST_OUTPUT<<EOF" >> $GITHUB_ENV
         echo "$pytest_output" >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
