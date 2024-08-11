@@ -54,6 +54,9 @@ jobs:
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          
           const output = `#### Pytest Results 🧪
           \`\`\`
           ${{ env.PYTEST_OUTPUT }}
@@ -61,12 +64,12 @@ jobs:
           
           **Result:** ${process.env.PYTEST_FAILED === 'true' ? '❌ Failed' : '✅ Passed'}`;
           
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.name,
+          await github.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number,
             body: output
-          })
+          });
 
     - name: Check test results
       if: failure()
