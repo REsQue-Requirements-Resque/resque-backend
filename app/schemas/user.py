@@ -40,3 +40,12 @@ class UserCreate(BaseModel):
                 "Name can only contain alphabets, spaces, hyphens, and apostrophes"
             )
         return value
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: EmailStr
+    name: str
+
+    class Config:
+        orm_mode = True

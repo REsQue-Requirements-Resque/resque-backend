@@ -1,18 +1,19 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from app.models.user import User
-from app.schemas.users import UserCreate
+from app.schemas.user import UserCreate
 from app.exceptions.user_exceptions import DuplicateEmailError, DatabaseError
 from app.core.security import get_password_hash
 
 
 class UserRepository:
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
 
-    def create_user(self, user_data: UserCreate) -> User:
+    async def create_user(self, user_data: UserCreate) -> User:
         try:
-            if self.check_user_existence(user_data.email):
+            if await self.check_user_existence(user_data.email):
                 raise DuplicateEmailError()
 
             hashed_password = get_password_hash(user_data.password)
@@ -23,43 +24,46 @@ class UserRepository:
             )
 
             self.db_session.add(new_user)
-            self.db_session.commit()
+            await self.db_session.commit()
+            await self.db_session.refresh(new_user)
 
             return new_user
         except IntegrityError:
-            self.db_session.rollback()
+            await self.db_session.rollback()
             raise DatabaseError("An error occurred while accessing the database")
         except DuplicateEmailError:
-            self.db_session.rollback()
+            await self.db_session.rollback()
             raise DuplicateEmailError("Email already exists")
         except Exception as e:
-            self.db_session.rollback()
+            await self.db_session.rollback()
             raise DatabaseError(f"An unexpected error occurred: {str(e)}")
 
-    def check_user_existence(self, email: str) -> bool:
+    async def check_user_existence(self, email: str) -> bool:
         email = email.lower()
-        return (
-            self.db_session.query(User).filter(User.email == email).first() is not None
-        )
+        result = await self.db_session.execute(select(User).filter(User.email == email))
+        return result.scalar_one_or_none() is not None
 
-    def get_user_by_email(self, email: str) -> User:
-        return self.db_session.query(User).filter(User.email == email).first()
+    async def get_user_by_email(self, email: str) -> User:
+        result = await self.db_session.execute(select(User).filter(User.email == email))
+        return result.scalar_one_or_none()
 
-    def get_user_by_id(self, user_id: int) -> User:
-        return self.db_session.query(User).filter(User.id == user_id).first()
+    async def get_user_by_id(self, user_id: int) -> User:
+        result = await self.db_session.execute(select(User).filter(User.id == user_id))
+        return result.scalar_one_or_none()
 
-    def update_user(self, user_id: int, user_data: dict) -> User:
-        user = self.get_user_by_id(user_id)
+    async def update_user(self, user_id: int, user_data: dict) -> User:
+        user = await self.get_user_by_id(user_id)
         if user:
             for key, value in user_data.items():
                 setattr(user, key, value)
-            self.db_session.commit()
+            await self.db_session.commit()
+            await self.db_session.refresh(user)
         return user
 
-    def delete_user(self, user_id: int) -> bool:
-        user = self.get_user_by_id(user_id)
+    async def delete_user(self, user_id: int) -> bool:
+        user = await self.get_user_by_id(user_id)
         if user:
-            self.db_session.delete(user)
-            self.db_session.commit()
+            await self.db_session.delete(user)
+            await self.db_session.commit()
             return True
         return False
