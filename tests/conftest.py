@@ -7,6 +7,12 @@ from app.core.config import settings
 # 테스트용 데이터베이스 URL 사용
 TEST_SQLALCHEMY_DATABASE_URL = settings.TEST_DATABASE_URL
 
+# SQLite URL 처리
+if TEST_SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    TEST_SQLALCHEMY_DATABASE_URL = TEST_SQLALCHEMY_DATABASE_URL.replace(
+        "sqlite:", "sqlite+aiosqlite:"
+    )
+
 
 @pytest.fixture(scope="session")
 def engine():
