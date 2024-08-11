@@ -20,27 +20,29 @@ jobs:
       with:
         python-version: '3.12.3'
 
-    - name: Install pipenv
-      run: |
-        python -m pip install --upgrade pip
-        pip install pipenv
-
-    - name: Generate requirements.txt
-      run: |
-        pipenv requirements > requirements.txt
-
     - name: Install dependencies
       run: |
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-asyncio
-        pip install sqlalchemy
-        pip install aiosqlite
-        pip install pydantic pydantic-settings
+        pip install pytest pytest-asyncio sqlalchemy aiosqlite
 
-    - name: Run pytest
+    - name: Debug info
+      run: |
+        echo "Python version:"
+        python --version
+        echo "Pip list:"
+        pip list
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        echo "Environment variables:"
+        env
+
+    - name: Run pytest with verbose output
       id: pytest
       run: |
-        pytest_output=$(python -m pytest -v -m req_1_basic_user_registration)
+        pytest_output=$(python -m pytest -v -s -m req_1_basic_user_registration)
         echo "PYTEST_OUTPUT<<EOF" >> $GITHUB_ENV
         echo "$pytest_output" >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
