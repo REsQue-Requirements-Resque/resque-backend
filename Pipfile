@@ -8,12 +8,15 @@ fastapi = "*"
 uvicorn = "*"
 sqlalchemy = "*"
 alembic = "*"
-pydantic = "*"
 python-dotenv = "*"
 pytest = "*"
 httpx = "*"
 pydantic-settings = "*"
 psycopg2-binary = "*"
+pydantic = {extras = ["email"], version = "*"}
+bcrypt = "*"
+aiosqlite = "*"
+pytest-asyncio = "*"
 
 [dev-packages]
 
