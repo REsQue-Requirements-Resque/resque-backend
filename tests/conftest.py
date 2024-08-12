@@ -3,20 +3,12 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.db.base import Base, get_async_db
 from app.core.config import settings
-
-# 테스트용 데이터베이스 URL 사용
-TEST_SQLALCHEMY_DATABASE_URL = settings.TEST_DATABASE_URL
-
-# SQLite URL 처리
-if TEST_SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
-    TEST_SQLALCHEMY_DATABASE_URL = TEST_SQLALCHEMY_DATABASE_URL.replace(
-        "sqlite:", "sqlite+aiosqlite:"
-    )
+from httpx import AsyncClient
 
 
 @pytest.fixture(scope="session")
 def engine():
-    engine = create_async_engine(TEST_SQLALCHEMY_DATABASE_URL, echo=True, future=True)
+    engine = create_async_engine(settings.TEST_DATABASE_URL, echo=True, future=True)
     yield engine
     engine.dispose()
 
@@ -43,5 +35,8 @@ async def client(db_session):
             await db_session.close()
 
     app.dependency_overrides[get_async_db] = override_get_async_db
-    yield app
+
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
+
     app.dependency_overrides.clear()
