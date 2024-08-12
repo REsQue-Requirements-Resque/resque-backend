@@ -42,7 +42,25 @@ class UserCreate(BaseModel):
         return value
 
 
-class UserLogin(BaseModel): ...
+class UserLogin(BaseModel):
+    email: EmailStr = Field(..., max_length=100)
+    password: str = Field(..., min_length=8, max_length=20)
+
+    @field_validator("password")
+    def validate_password(cls, value: str) -> str:
+        return validate_field([lambda x: x.strip()], value)  # 공백 제거
+
+    @staticmethod
+    def password_complexity(value: str) -> str:
+        if not (
+            any(c.islower() for c in value)
+            and any(c.isdigit() for c in value)
+            and any(c in "!@#$%^&*()_+" for c in value)
+        ):
+            raise ValueError(
+                "Password must include at least one lowercase letter, one number, and one special character"
+            )
+        return value
 
 
 class UserResponse(BaseModel):
