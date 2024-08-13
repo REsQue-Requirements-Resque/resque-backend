@@ -1,7 +1,7 @@
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from app.models import User
+from sqlalchemy import select, delete
+from app.models import User, LoginAttempt
 from app.core.security import verify_password
 from app.exceptions.user_exceptions import (
     InvalidCredentialsError,
@@ -10,6 +10,7 @@ from app.exceptions.user_exceptions import (
 )
 from pydantic import ValidationError
 from app.schemas.user import UserLogin
+from datetime import datetime, timedelta
 
 
 class AuthenticationService:
@@ -20,7 +21,7 @@ class AuthenticationService:
         try:
             user_login = UserLogin(email=email, password=password)
         except ValidationError:
-            raise InvalidCredentialsError("Invalid email or password")
+            raise InvalidCredentialsError("Invalid email or password format")
 
         if not await self.check_login_attempts(user_login.email):
             raise TooManyAttemptsError(
@@ -45,17 +46,33 @@ class AuthenticationService:
             raise DatabaseError(f"Error retrieving user: {str(e)}")
 
     async def check_login_attempts(self, email: str) -> bool:
-        # 이 메서드는 로그인 시도 횟수를 확인하고 제한을 초과했는지 여부를 반환합니다.
-        # 실제 구현에서는 데이터베이스나 캐시에서 로그인 시도 횟수를 조회해야 합니다.
-        # 여기서는 간단히 True를 반환하는 것으로 대체합니다.
-        return True
+        try:
+            five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
+            result = await self.db_session.execute(
+                select(LoginAttempt)
+                .filter(LoginAttempt.email == email)
+                .filter(LoginAttempt.attempt_time > five_minutes_ago)
+            )
+            attempts = result.scalars().all()
+            return len(attempts) < 5
+        except Exception as e:
+            raise DatabaseError(f"Error checking login attempts: {str(e)}")
 
     async def record_failed_attempt(self, email: str) -> None:
-        # 이 메서드는 실패한 로그인 시도를 기록합니다.
-        # 실제 구현에서는 데이터베이스나 캐시에 기록해야 합니다.
-        pass
+        try:
+            new_attempt = LoginAttempt(email=email, attempt_time=datetime.utcnow())
+            self.db_session.add(new_attempt)
+            await self.db_session.commit()
+        except Exception as e:
+            await self.db_session.rollback()
+            raise DatabaseError(f"Error recording failed attempt: {str(e)}")
 
     async def reset_login_attempts(self, email: str) -> None:
-        # 이 메서드는 성공적인 로그인 후 로그인 시도 횟수를 초기화합니다.
-        # 실제 구현에서는 데이터베이스나 캐시의 기록을 초기화해야 합니다.
-        pass
+        try:
+            await self.db_session.execute(
+                delete(LoginAttempt).where(LoginAttempt.email == email)
+            )
+            await self.db_session.commit()
+        except Exception as e:
+            await self.db_session.rollback()
+            raise DatabaseError(f"Error resetting login attempts: {str(e)}")

@@ -1,2 +1,5 @@
 from app.db.base import Base
-from app.models.user import User  # 향후 다른 모델들도 여기에 import
+from app.models.user import User
+from app.models.login_attempt import LoginAttempt
+
+__all__ = ["User", "LoginAttempt"]
