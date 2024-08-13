@@ -77,10 +77,7 @@ class TestUserAuthentication:
     )
     async def test_login_input_validation(self, email, password, expected_error):
         with pytest.raises(expected_error):
-            user_login = UserLogin(email=email, password=password)
-            await self.auth_service.authenticate_user(
-                user_login.email, user_login.password
-            )
+            await self.auth_service.authenticate_user(email=email, password=password)
 
     async def test_password_hashing_and_verification(self):
         password = "testPassword123!"

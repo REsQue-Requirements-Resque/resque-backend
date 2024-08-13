@@ -8,24 +8,31 @@ from app.exceptions.user_exceptions import (
     TooManyAttemptsError,
     DatabaseError,
 )
+from pydantic import ValidationError
+from app.schemas.user import UserLogin
 
 
-class AuthenticationServiceImpl:
+class AuthenticationService:
     def __init__(self, db_session: AsyncSession):
         self.db_session = db_session
 
-    async def authenticate_user(self, email: str, password: str) -> User:
-        if not await self.check_login_attempts(email):
+    async def authenticate_user(self, email: str, password: str) -> Optional[User]:
+        try:
+            user_login = UserLogin(email=email, password=password)
+        except ValidationError:
+            raise InvalidCredentialsError("Invalid email or password")
+
+        if not await self.check_login_attempts(user_login.email):
             raise TooManyAttemptsError(
                 "Too many login attempts. Please try again later."
             )
 
-        user = await self.get_user_by_email(email)
-        if not user or not verify_password(password, user.hashed_password):
-            await self.record_failed_attempt(email)
+        user = await self.get_user_by_email(user_login.email)
+        if not user or not verify_password(user_login.password, user.hashed_password):
+            await self.record_failed_attempt(user_login.email)
             raise InvalidCredentialsError("Invalid email or password")
 
-        await self.reset_login_attempts(email)
+        await self.reset_login_attempts(user_login.email)
         return user
 
     async def get_user_by_email(self, email: str) -> Optional[User]:

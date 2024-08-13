@@ -5,6 +5,8 @@ from app.db.base import Base, get_async_db
 from app.core.config import settings
 from httpx import AsyncClient
 
+pytest_plugins = ["pytest_mock"]
+
 
 @pytest.fixture(scope="session")
 def engine():
