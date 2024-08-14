@@ -11,4 +11,6 @@ class User(Base):
     name = Column(String)
     hashed_password = Column(String)
 
-    projects = relationship("Project", back_populates="founder")
+    projects = relationship(
+        "Project", back_populates="founder", cascade="all, delete-orphan"
+    )
