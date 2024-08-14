@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from app.db.base import Base
+from datetime import datetime
 
 
 class Project(Base):
@@ -11,6 +12,7 @@ class Project(Base):
     description = Column(String, nullable=True)
     founder_id = Column(Integer, ForeignKey("users.id"), index=True)
     is_deleted = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationship
     founder = relationship("User", back_populates="projects")
