@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, ANY
 from app.services.project_service import ProjectService
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.models.project import Project
@@ -23,7 +23,9 @@ class TestProjectService:
         project_data = ProjectCreate(
             title="Test Project", description="Test Description", founder_id=1
         )
-        mock_project_repo.create.return_value = Project(id=1, **project_data.dict())
+        mock_project_repo.create.return_value = Project(
+            id=1, **project_data.model_dump()
+        )
 
         # Act
         result = await project_service.create_project(project_data)
@@ -33,7 +35,14 @@ class TestProjectService:
         assert result.title == "Test Project"
         assert result.description == "Test Description"
         assert result.founder_id == 1
-        mock_project_repo.create.assert_called_once_with(Project(**project_data.dict()))
+        mock_project_repo.create.assert_called_once_with(ANY)
+
+        # Additional assertion to check the contents of the created Project
+        created_project = mock_project_repo.create.call_args[0][0]
+        assert isinstance(created_project, Project)
+        assert created_project.title == project_data.title
+        assert created_project.description == project_data.description
+        assert created_project.founder_id == project_data.founder_id
 
     async def test_get_project(self, project_service, mock_project_repo):
         # Arrange
