@@ -51,3 +51,8 @@ class ProjectCreate(BaseModel):
         if value <= 0:
             raise ValueError("Founder ID must be a positive integer")
         return value
+
+
+class ProjectUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
