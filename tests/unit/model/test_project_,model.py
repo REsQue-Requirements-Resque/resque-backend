@@ -8,11 +8,16 @@ from datetime import datetime
 @pytest.mark.asyncio
 class TestProjectModel:
     async def test_create_project(self, db_session):
-        # 프로젝트 생성 테스트
+        # First, create a user
+        user = User(email="test@example.com", hashed_password="hashed_password")
+        db_session.add(user)
+        await db_session.commit()
+
+        # Now create a project
         project = Project(
             title="Test Project",
             description="This is a test project",
-            founder_id=1,  # 실제 사용자 ID로 대체해야 함
+            founder_id=user.id,
         )
         db_session.add(project)
         await db_session.commit()
@@ -20,9 +25,13 @@ class TestProjectModel:
         assert project.id is not None
         assert project.title == "Test Project"
         assert project.description == "This is a test project"
-        assert project.founder_id == 1
+        assert project.founder_id == user.id
         assert isinstance(project.created_at, datetime)
         assert isinstance(project.updated_at, datetime)
+
+        # Test the relationship
+        assert project.founder == user
+        assert project in user.projects
 
     async def test_project_title_unique(self, db_session):
         # 프로젝트 제목 유일성 테스트
@@ -59,8 +68,6 @@ class TestProjectModel:
         assert project.is_deleted is False  # is_deleted 필드가 있는 경우
 
     async def test_project_cascade_delete(self, db_session):
-        # 프로젝트 삭제 시 연관된 데이터 cascade 삭제 테스트
-        # (이 테스트는 프로젝트와 연관된 다른 모델이 있을 경우에만 필요)
         user = User(email="cascade@example.com", hashed_password="hashed_password")
         db_session.add(user)
         await db_session.commit()
@@ -69,14 +76,9 @@ class TestProjectModel:
         db_session.add(project)
         await db_session.commit()
 
-        # 여기에 프로젝트와 연관된 다른 모델 인스턴스 생성 (예: 태스크, 문서 등)
-
-        await db_session.delete(project)
+        # Delete the user
+        await db_session.delete(user)
         await db_session.commit()
 
-        # 프로젝트가 삭제되었는지 확인
+        # Check if the project is also deleted (if cascade delete is set up)
         assert await db_session.get(Project, project.id) is None
-        # 연관된 데이터도 삭제되었는지 확인
-
-
-# 필요한 경우 추가 테스트를 여기에 작성할 수 있습니다.
