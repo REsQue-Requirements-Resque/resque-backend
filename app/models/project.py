@@ -13,6 +13,7 @@ class Project(Base):
     founder_id = Column(Integer, ForeignKey("users.id"), index=True)
     is_deleted = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationship
     founder = relationship("User", back_populates="projects")
