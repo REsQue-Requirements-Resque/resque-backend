@@ -16,16 +16,17 @@ jobs:
         title="${{ github.event.issue.title }}"
         issue_number="${{ github.event.issue.number }}"
         
-        # Determine the prefix (req or fix)
-        if [[ "$title" =~ ^REQ: ]]; then
+        # Determine the prefix based on issue labels
+        if [[ "${{ contains(github.event.issue.labels.*.name, 'requirements') }}" == "true" ]]; then
           prefix="req"
-        elif [[ "$title" =~ ^FIX: ]]; then
+        elif [[ "${{ contains(github.event.issue.labels.*.name, 'bugfix') }}" == "true" ]]; then
           prefix="fix"
         else
-          prefix="issue"
+          echo "Neither 'requirements' nor 'bugfix' label found. Skipping branch creation."
+          exit 0
         fi
         
-        # Remove the prefix (REQ: or FIX:) and trim whitespace
+        # Remove any prefix like 'REQ:' or 'FIX:' and trim whitespace
         clean_title=$(echo "$title" | sed -E 's/^(REQ:|FIX:)\s*//i' | awk '{$1=$1};1')
         
         # Convert to lowercase and replace spaces with hyphens
@@ -39,7 +40,8 @@ jobs:
         
         echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
 
-    - name: Create branch from develop
+    - name: Create branch
+      if: env.BRANCH_NAME != ''
       run: |
         git config user.name github-actions
         git config user.email github-actions@github.com

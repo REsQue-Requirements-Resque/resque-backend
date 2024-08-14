@@ -4,9 +4,14 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   run-tests:
     runs-on: ubuntu-latest
+    
     steps:
     - uses: actions/checkout@v2
 
@@ -15,30 +20,29 @@ jobs:
       with:
         python-version: '3.12.3'
 
-    - name: Install pipenv
-      run: |
-        python -m pip install --upgrade pip
-        pip install pipenv
-
-    - name: Generate requirements.txt
-      run: |
-        pipenv lock -r > requirements.txt
-
     - name: Install dependencies
       run: |
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest pytest-asyncio sqlalchemy aiosqlite
 
-    - name: Parse branch name
-      id: parse-branch
+    - name: Debug info
       run: |
-        branch_name="${{ github.head_ref }}"
-        parsed_name=$(echo $branch_name | sed 's/^[^:]*: *//' | tr '[:upper:] ' '[:lower:]_' | sed 's/[^a-z0-9_]//g')
-        echo "PARSED_BRANCH_NAME=$parsed_name" >> $GITHUB_ENV
+        echo "Python version:"
+        python --version
+        echo "Pip list:"
+        pip list
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        echo "Environment variables:"
+        env
 
-    - name: Run pytest
+    - name: Run pytest with verbose output
       id: pytest
       run: |
-        pytest_output=$(pytest -v -m ${{ env.PARSED_BRANCH_NAME }})
+        pytest_output=$(python -m pytest -v -s -m req_1_basic_user_registration)
         echo "PYTEST_OUTPUT<<EOF" >> $GITHUB_ENV
         echo "$pytest_output" >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
@@ -54,6 +58,9 @@ jobs:
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          
           const output = `#### Pytest Results 🧪
           \`\`\`
           ${{ env.PYTEST_OUTPUT }}
@@ -61,14 +68,9 @@ jobs:
           
           **Result:** ${process.env.PYTEST_FAILED === 'true' ? '❌ Failed' : '✅ Passed'}`;
           
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.name,
+          await github.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number,
             body: output
-          })
-
-    - name: Check test results
-      if: failure()
-      run: |
-        echo "Tests failed. Please check the test output above."
+          });
