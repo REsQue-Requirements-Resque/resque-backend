@@ -17,6 +17,9 @@ pydantic = {extras = ["email"], version = "*"}
 bcrypt = "*"
 aiosqlite = "*"
 pytest-asyncio = "*"
+pytest-mock = "*"
+freezegun = "*"
+python-multipart = "*"
 
 [dev-packages]
 
