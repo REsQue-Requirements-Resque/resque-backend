@@ -1,12 +1,12 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from app.utils.validator import validate_field
 import re
 
 
 class ProjectCreate(BaseModel):
     title: str
-    description: str | None
-    founder_id: int
+    description: str | None = None
+    founder_id: int = Field(..., strict=True)
 
     @field_validator("title")
     def validate_title(cls, value: str) -> str:

@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from app.schemas.project import ProjectCreate
+from app.schemas.project import ProjectCreate  # 실제 경로에 맞게 수정해야 합니다
 
 
 @pytest.mark.unit
@@ -26,9 +26,10 @@ class TestProjectSchemaValidation:
 
     def test_title_non_english(self):
         data = self.get_valid_data()
-        data["title"] = "프로젝트"
+        data["title"] = "프로젝트123"
         with pytest.raises(
-            ValidationError, match="Project title must contain only English characters"
+            ValidationError,
+            match="Project title must contain only English characters and numbers",
         ):
             ProjectCreate(**data)
 
@@ -36,7 +37,7 @@ class TestProjectSchemaValidation:
         data = self.get_valid_data()
         data["title"] = "ab"
         with pytest.raises(
-            ValidationError, match="String should have at least 3 characters"
+            ValidationError, match="Project title must be between 3 and 100 characters"
         ):
             ProjectCreate(**data)
 
@@ -44,7 +45,7 @@ class TestProjectSchemaValidation:
         data = self.get_valid_data()
         data["title"] = "a" * 101
         with pytest.raises(
-            ValidationError, match="String should have at most 100 characters"
+            ValidationError, match="Project title must be between 3 and 100 characters"
         ):
             ProjectCreate(**data)
 
@@ -52,14 +53,14 @@ class TestProjectSchemaValidation:
         data = self.get_valid_data()
         data["description"] = "a" * 1001
         with pytest.raises(
-            ValidationError, match="String should have at most 1000 characters"
+            ValidationError, match="Project description must not exceed 1000 characters"
         ):
             ProjectCreate(**data)
 
     def test_title_missing(self):
         data = self.get_valid_data()
         del data["title"]
-        with pytest.raises(ValidationError, match="field required"):
+        with pytest.raises(ValidationError, match="Field required"):
             ProjectCreate(**data)
 
     def test_description_optional(self):
@@ -72,7 +73,7 @@ class TestProjectSchemaValidation:
         data = self.get_valid_data()
         data["founder_id"] = 0
         with pytest.raises(
-            ValidationError, match="ensure this value is greater than 0"
+            ValidationError, match="Founder ID must be a positive integer"
         ):
             ProjectCreate(**data)
 
@@ -82,8 +83,54 @@ class TestProjectSchemaValidation:
         project = ProjectCreate(**data)
         assert project.title == "Valid Project"
 
-    def test_description_whitespace_preserved(self):
+    def test_description_whitespace_stripped(self):
         data = self.get_valid_data()
         data["description"] = " This is a   valid description. "
         project = ProjectCreate(**data)
-        assert project.description == " This is a   valid description. "
+        assert project.description == "This is a   valid description."
+
+    def test_title_with_numbers(self):
+        data = self.get_valid_data()
+        data["title"] = "Project 123"
+        project = ProjectCreate(**data)
+        assert project.title == "Project 123"
+
+    def test_empty_description(self):
+        data = self.get_valid_data()
+        data["description"] = ""
+        project = ProjectCreate(**data)
+        assert project.description == ""
+
+    def test_description_only_whitespace(self):
+        data = self.get_valid_data()
+        data["description"] = "   "
+        project = ProjectCreate(**data)
+        assert project.description == ""
+
+    def test_founder_id_string(self):
+        data = self.get_valid_data()
+        data["founder_id"] = "1"
+        with pytest.raises(ValidationError, match="Input should be a valid integer"):
+            ProjectCreate(**data)
+
+    def test_founder_id_float(self):
+        data = self.get_valid_data()
+        data["founder_id"] = 1.5
+        with pytest.raises(ValidationError, match="Input should be a valid integer"):
+            ProjectCreate(**data)
+
+    def test_founder_id_zero(self):
+        data = self.get_valid_data()
+        data["founder_id"] = 0
+        with pytest.raises(
+            ValidationError, match="Founder ID must be a positive integer"
+        ):
+            ProjectCreate(**data)
+
+    def test_founder_id_negative(self):
+        data = self.get_valid_data()
+        data["founder_id"] = -1
+        with pytest.raises(
+            ValidationError, match="Founder ID must be a positive integer"
+        ):
+            ProjectCreate(**data)
