@@ -1,18 +1,11 @@
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, field_validator, ConfigDict, Field, model_validator
 from app.utils.validator import validate_field
 import re
 
 
-class ProjectCreate(BaseModel):
-    title: str
+class ProjectBase(BaseModel):
+    title: str | None = None
     description: str | None = None
-    founder_id: int = Field(..., strict=True)
-
-    @field_validator("title")
-    def validate_title(cls, value: str) -> str:
-        return validate_field(
-            [cls.title_characters, cls.check_title_length], value.strip()
-        )
 
     @staticmethod
     def title_characters(s: str) -> str:
@@ -28,31 +21,41 @@ class ProjectCreate(BaseModel):
             raise ValueError("Project title must be between 3 and 100 characters")
         return value
 
-    @field_validator("description")
-    def validate_description(cls, value: str | None) -> str | None:
-        if value:
-            return validate_field(
-                [lambda x: x.strip(), cls.check_description_length], value
-            )
-        return value
-
     @staticmethod
     def check_description_length(value: str | None) -> str | None:
         if value and len(value) > 1000:
             raise ValueError("Project description must not exceed 1000 characters")
         return value
 
-    @field_validator("founder_id")
-    def validate_founder_id(cls, value: int) -> int:
-        return cls.check_positive_founder_id(value)
+    @field_validator("title")
+    def validate_title(cls, value: str | None) -> str | None:
+        if value is not None:
+            return validate_field(
+                [cls.title_characters, cls.check_title_length], value.strip()
+            )
+        return value
 
-    @staticmethod
-    def check_positive_founder_id(value: int) -> int:
-        if value <= 0:
-            raise ValueError("Founder ID must be a positive integer")
+    @field_validator("description")
+    def validate_description(cls, value: str | None) -> str | None:
+        if value is not None:
+            return validate_field(
+                [lambda x: x.strip(), cls.check_description_length], value
+            )
         return value
 
 
-class ProjectUpdate(BaseModel):
-    title: str | None = None
+class ProjectCreate(ProjectBase):
+    pass
+
+
+class ProjectUpdate(ProjectBase):
+    pass
+
+
+class ProjectResponse(BaseModel):
+    id: int
+    title: str
     description: str | None = None
+    founder_id: int
+
+    model_config = ConfigDict(from_attributes=True)
