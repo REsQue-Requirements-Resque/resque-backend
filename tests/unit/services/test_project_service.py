@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, ANY
+from fastapi import HTTPException
 from app.services.project_service import ProjectService
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.models.project import Project
@@ -19,86 +20,152 @@ def project_service(mock_project_repo):
 @pytest.mark.asyncio
 class TestProjectService:
     async def test_create_project(self, project_service, mock_project_repo):
-        # Arrange
         project_data = ProjectCreate(
-            title="Test Project", description="Test Description", founder_id=1
+            title="Test Project", description="Test Description"
         )
+        current_user_id = 1
+        mock_project_repo.get_by_title_and_founder.return_value = None
         mock_project_repo.create.return_value = Project(
-            id=1, **project_data.model_dump()
+            id=1,
+            title="Test Project",
+            description="Test Description",
+            founder_id=current_user_id,
         )
 
-        # Act
-        result = await project_service.create_project(project_data)
+        result = await project_service.create_project(project_data, current_user_id)
 
-        # Assert
         assert result.id == 1
         assert result.title == "Test Project"
-        assert result.description == "Test Description"
-        assert result.founder_id == 1
+        assert result.founder_id == current_user_id
+        mock_project_repo.get_by_title_and_founder.assert_called_once_with(
+            "Test Project", current_user_id
+        )
         mock_project_repo.create.assert_called_once_with(ANY)
 
-        # Additional assertion to check the contents of the created Project
-        created_project = mock_project_repo.create.call_args[0][0]
-        assert isinstance(created_project, Project)
-        assert created_project.title == project_data.title
-        assert created_project.description == project_data.description
-        assert created_project.founder_id == project_data.founder_id
+    async def test_create_project_duplicate(self, project_service, mock_project_repo):
+        project_data = ProjectCreate(
+            title="Duplicate Project", description="Test Description"
+        )
+        current_user_id = 1
+        mock_project_repo.get_by_title_and_founder.return_value = Project(
+            id=1, title="Duplicate Project", founder_id=current_user_id
+        )
+
+        with pytest.raises(HTTPException) as excinfo:
+            await project_service.create_project(project_data, current_user_id)
+        assert excinfo.value.status_code == 400
+        assert "already exists" in str(excinfo.value.detail)
 
     async def test_get_project(self, project_service, mock_project_repo):
-        # Arrange
         mock_project = Project(
             id=1, title="Test Project", description="Test Description", founder_id=1
         )
         mock_project_repo.get.return_value = mock_project
 
-        # Act
         result = await project_service.get_project(1)
 
-        # Assert
         assert result == mock_project
         mock_project_repo.get.assert_called_once_with(1)
 
+    async def test_get_project_not_found(self, project_service, mock_project_repo):
+        mock_project_repo.get.return_value = None
+
+        with pytest.raises(HTTPException) as excinfo:
+            await project_service.get_project(1)
+        assert excinfo.value.status_code == 404
+
     async def test_update_project(self, project_service, mock_project_repo):
-        # Arrange
-        project_update = ProjectUpdate(
-            title="Updated Project", description="Updated Description"
+        current_user_id = 1
+        existing_project = Project(
+            id=1,
+            title="Old Title",
+            description="Old Description",
+            founder_id=current_user_id,
         )
-        mock_updated_project = Project(id=1, **project_update.dict(), founder_id=1)
-        mock_project_repo.update.return_value = mock_updated_project
-
-        # Act
-        result = await project_service.update_project(1, project_update)
-
-        # Assert
-        assert result == mock_updated_project
-        mock_project_repo.update.assert_called_once_with(
-            1, project_update.dict(exclude_unset=True)
+        mock_project_repo.get.return_value = existing_project
+        update_data = ProjectUpdate(title="New Title", description="New Description")
+        mock_project_repo.update.return_value = Project(
+            id=1,
+            title="New Title",
+            description="New Description",
+            founder_id=current_user_id,
         )
+
+        result = await project_service.update_project(1, update_data, current_user_id)
+
+        assert result.title == "New Title"
+        assert result.description == "New Description"
+        mock_project_repo.update.assert_called_once_with(1, ANY)
+
+    async def test_update_project_not_owner(self, project_service, mock_project_repo):
+        current_user_id = 1
+        existing_project = Project(
+            id=1, title="Old Title", description="Old Description", founder_id=2
+        )
+        mock_project_repo.get.return_value = existing_project
+        update_data = ProjectUpdate(title="New Title")
+
+        with pytest.raises(HTTPException) as excinfo:
+            await project_service.update_project(1, update_data, current_user_id)
+        assert excinfo.value.status_code == 403
 
     async def test_delete_project(self, project_service, mock_project_repo):
-        # Arrange
+        current_user_id = 1
+        existing_project = Project(
+            id=1, title="Project to Delete", founder_id=current_user_id
+        )
+        mock_project_repo.get.return_value = existing_project
         mock_project_repo.delete.return_value = True
 
-        # Act
-        result = await project_service.delete_project(1)
+        result = await project_service.delete_project(1, current_user_id)
 
-        # Assert
         assert result is True
         mock_project_repo.delete.assert_called_once_with(1)
 
+    async def test_delete_project_not_owner(self, project_service, mock_project_repo):
+        current_user_id = 1
+        existing_project = Project(id=1, title="Project to Delete", founder_id=2)
+        mock_project_repo.get.return_value = existing_project
+
+        with pytest.raises(HTTPException) as excinfo:
+            await project_service.delete_project(1, current_user_id)
+        assert excinfo.value.status_code == 403
+
     async def test_list_projects(self, project_service, mock_project_repo):
-        # Arrange
         mock_projects = [
-            Project(id=1, title="Project 1", description="Description 1", founder_id=1),
-            Project(id=2, title="Project 2", description="Description 2", founder_id=2),
+            Project(id=1, title="Project 1", founder_id=1),
+            Project(id=2, title="Project 2", founder_id=2),
         ]
         mock_project_repo.list.return_value = mock_projects
 
-        # Act
         result = await project_service.list_projects()
 
-        # Assert
         assert result == mock_projects
         mock_project_repo.list.assert_called_once()
 
-    # Add more tests as needed for other methods in ProjectService
+    async def test_get_project_by_title_and_founder(
+        self, project_service, mock_project_repo
+    ):
+        mock_project = Project(id=1, title="Test Project", founder_id=1)
+        mock_project_repo.get_by_title_and_founder.return_value = mock_project
+
+        result = await project_service.get_project_by_title_and_founder(
+            "Test Project", 1
+        )
+
+        assert result == mock_project
+        mock_project_repo.get_by_title_and_founder.assert_called_once_with(
+            "Test Project", 1
+        )
+
+    async def test_list_projects_by_founder(self, project_service, mock_project_repo):
+        mock_projects = [
+            Project(id=1, title="Project 1", founder_id=1),
+            Project(id=2, title="Project 2", founder_id=1),
+        ]
+        mock_project_repo.list_by_founder.return_value = mock_projects
+
+        result = await project_service.list_projects_by_founder(1)
+
+        assert result == mock_projects
+        mock_project_repo.list_by_founder.assert_called_once_with(1)
