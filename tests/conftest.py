@@ -9,7 +9,9 @@ from app.models import User
 from app.core.security import get_password_hash
 import uuid
 import ssl
-
+from app.repositories.user_repository import UserRepository
+from app.schemas.user import UserCreate
+from app.core.security import create_access_token
 
 @pytest.fixture(scope="session")
 def engine():
@@ -86,3 +88,23 @@ async def test_user(db_session: AsyncSession, unique_email):
     await db_session.commit()
     await db_session.refresh(user)
     return user
+
+
+@pytest.fixture
+async def user_repository(db_session: AsyncSession):
+    return UserRepository(db_session)
+
+
+@pytest.fixture
+async def test_user(user_repository: UserRepository, unique_email):
+    user_data = UserCreate(
+        email=unique_email, password="SecurePass123!", name="Test User"
+    )
+    user = await user_repository.create_user(user_data)
+    return user
+
+
+@pytest.fixture
+async def auth_headers(test_user: User):
+    access_token = create_access_token(data={"sub": test_user.email})
+    return {"Authorization": f"Bearer {access_token}"}

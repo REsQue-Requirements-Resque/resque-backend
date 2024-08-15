@@ -1,136 +1,154 @@
 import pytest
 from pydantic import ValidationError
-from app.schemas.project import ProjectCreate  # 실제 경로에 맞게 수정해야 합니다
+from app.schemas.project import ProjectCreate, ProjectUpdate
 
 
 @pytest.mark.unit
-@pytest.mark.req_14_project_creation
+@pytest.mark.schemas
 class TestProjectSchemaValidation:
-    @classmethod
-    def setup_class(cls):
-        cls.valid_data = {
+    @pytest.fixture
+    def valid_data(self):
+        return {
             "title": "Valid Project",
             "description": "This is a valid project description.",
-            "founder_id": 1,
         }
 
-    @classmethod
-    def get_valid_data(cls):
-        return cls.valid_data.copy()
+    def test_valid_project_creation(self, valid_data):
+        project = ProjectCreate(**valid_data)
+        assert project.title == valid_data["title"]
+        assert project.description == valid_data["description"]
 
-    def test_valid_project_creation(self):
-        project = ProjectCreate(**self.get_valid_data())
-        assert project.title == self.valid_data["title"]
-        assert project.description == self.valid_data["description"]
-        assert project.founder_id == self.valid_data["founder_id"]
-
-    def test_title_non_english(self):
-        data = self.get_valid_data()
-        data["title"] = "프로젝트123"
+    def test_title_non_english(self, valid_data):
+        data = valid_data.copy()
+        data["title"] = "프로젝트"
         with pytest.raises(
             ValidationError,
             match="Project title must contain only English characters and numbers",
         ):
             ProjectCreate(**data)
 
-    def test_title_too_short(self):
-        data = self.get_valid_data()
+    def test_title_too_short(self, valid_data):
+        data = valid_data.copy()
         data["title"] = "ab"
         with pytest.raises(
             ValidationError, match="Project title must be between 3 and 100 characters"
         ):
             ProjectCreate(**data)
 
-    def test_title_too_long(self):
-        data = self.get_valid_data()
+    def test_title_too_long(self, valid_data):
+        data = valid_data.copy()
         data["title"] = "a" * 101
         with pytest.raises(
             ValidationError, match="Project title must be between 3 and 100 characters"
         ):
             ProjectCreate(**data)
 
-    def test_description_too_long(self):
-        data = self.get_valid_data()
+    def test_description_too_long(self, valid_data):
+        data = valid_data.copy()
         data["description"] = "a" * 1001
         with pytest.raises(
             ValidationError, match="Project description must not exceed 1000 characters"
         ):
             ProjectCreate(**data)
 
-    def test_title_missing(self):
-        data = self.get_valid_data()
+    def test_title_missing(self, valid_data):
+        data = valid_data.copy()
         del data["title"]
         with pytest.raises(ValidationError, match="Field required"):
             ProjectCreate(**data)
 
-    def test_description_optional(self):
-        data = self.get_valid_data()
+    def test_description_optional(self, valid_data):
+        data = valid_data.copy()
         del data["description"]
         project = ProjectCreate(**data)
         assert project.description is None
 
-    def test_founder_id_must_be_positive(self):
-        data = self.get_valid_data()
-        data["founder_id"] = 0
-        with pytest.raises(
-            ValidationError, match="Founder ID must be a positive integer"
-        ):
-            ProjectCreate(**data)
-
-    def test_title_whitespace_stripped(self):
-        data = self.get_valid_data()
-        data["title"] = " Valid Project "
+    def test_title_whitespace_stripped(self, valid_data):
+        data = valid_data.copy()
+        data["title"] = "  Whitespace  "
         project = ProjectCreate(**data)
-        assert project.title == "Valid Project"
+        assert project.title == "Whitespace"
 
-    def test_description_whitespace_stripped(self):
-        data = self.get_valid_data()
-        data["description"] = " This is a   valid description. "
+    def test_description_whitespace_stripped(self, valid_data):
+        data = valid_data.copy()
+        data["description"] = "  Description  "
         project = ProjectCreate(**data)
-        assert project.description == "This is a   valid description."
+        assert project.description == "Description"
 
-    def test_title_with_numbers(self):
-        data = self.get_valid_data()
+    def test_title_with_numbers(self, valid_data):
+        data = valid_data.copy()
         data["title"] = "Project 123"
         project = ProjectCreate(**data)
         assert project.title == "Project 123"
 
-    def test_empty_description(self):
-        data = self.get_valid_data()
+    def test_empty_description(self, valid_data):
+        data = valid_data.copy()
         data["description"] = ""
         project = ProjectCreate(**data)
         assert project.description == ""
 
-    def test_description_only_whitespace(self):
-        data = self.get_valid_data()
+    def test_description_only_whitespace(self, valid_data):
+        data = valid_data.copy()
         data["description"] = "   "
         project = ProjectCreate(**data)
         assert project.description == ""
 
-    def test_founder_id_string(self):
-        data = self.get_valid_data()
-        data["founder_id"] = "1"
-        with pytest.raises(ValidationError, match="Input should be a valid integer"):
-            ProjectCreate(**data)
-
-    def test_founder_id_float(self):
-        data = self.get_valid_data()
-        data["founder_id"] = 1.5
-        with pytest.raises(ValidationError, match="Input should be a valid integer"):
-            ProjectCreate(**data)
-
-    def test_founder_id_zero(self):
-        data = self.get_valid_data()
-        data["founder_id"] = 0
+    def test_title_with_special_characters(self, valid_data):
+        data = valid_data.copy()
+        data["title"] = "Project@123"
         with pytest.raises(
-            ValidationError, match="Founder ID must be a positive integer"
+            ValidationError,
+            match="Project title must contain only English characters and numbers",
         ):
             ProjectCreate(**data)
 
-    def test_founder_id_negative(self):
-        data = self.get_valid_data()
-        data["founder_id"] = -1
+    def test_title_minimum_length(self, valid_data):
+        data = valid_data.copy()
+        data["title"] = "abc"
+        project = ProjectCreate(**data)
+        assert project.title == "abc"
+
+    def test_title_maximum_length(self, valid_data):
+        data = valid_data.copy()
+        data["title"] = "a" * 100
+        project = ProjectCreate(**data)
+        assert len(project.title) == 100
+
+    def test_description_null(self, valid_data):
+        data = valid_data.copy()
+        data["description"] = None
+        project = ProjectCreate(**data)
+        assert project.description is None
+
+    def test_title_leading_trailing_spaces(self, valid_data):
+        data = valid_data.copy()
+        data["title"] = "  Leading and trailing spaces  "
+        project = ProjectCreate(**data)
+        assert project.title == "Leading and trailing spaces"
+
+    # ProjectUpdate 테스트
+    def test_project_update_empty(self):
+        with pytest.raises(ValidationError):
+            ProjectUpdate()
+
+    def test_project_update_partial(self):
+        update = ProjectUpdate(title="Updated Title")
+        assert update.title == "Updated Title"
+        assert update.description is None
+
+    def test_project_update_full(self):
+        update = ProjectUpdate(title="Updated Title", description="Updated Description")
+        assert update.title == "Updated Title"
+        assert update.description == "Updated Description"
+
+    def test_project_update_invalid_title(self):
         with pytest.raises(
-            ValidationError, match="Founder ID must be a positive integer"
+            ValidationError, match="Project title must be between 3 and 100 characters"
         ):
-            ProjectCreate(**data)
+            ProjectUpdate(title="a")
+
+    def test_project_update_invalid_description(self):
+        with pytest.raises(
+            ValidationError, match="Project description must not exceed 1000 characters"
+        ):
+            ProjectUpdate(description="a" * 1001)

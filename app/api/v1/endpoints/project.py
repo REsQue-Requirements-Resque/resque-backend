@@ -80,7 +80,12 @@ async def delete_project(
     current_user: User = Depends(get_current_user),
     project_service: ProjectService = Depends(get_project_service),
 ):
-    await project_service.delete_project(project_id, current_user.id)
+    try:
+        await project_service.delete_project(project_id, current_user.id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 @router.get("", response_model=List[ProjectResponse])
