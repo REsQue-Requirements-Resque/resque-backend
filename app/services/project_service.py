@@ -39,32 +39,38 @@ class ProjectService:
     async def update_project(
         self, project_id: int, project_data: ProjectUpdate, current_user_id: int
     ) -> Project:
-        existing_project = await self.get_project(project_id)
+        try:
+            existing_project = await self.get_project(project_id)
+        except HTTPException as e:
+            raise e
+
         if existing_project.founder_id != current_user_id:
             raise HTTPException(
                 status_code=403, detail="Not authorized to update this project"
             )
 
         update_dict = project_data.model_dump(exclude_unset=True)
+        if not update_dict:
+            raise HTTPException(status_code=400, detail="No update data provided")
+
         updated_project = await self.project_repo.update(project_id, update_dict)
         if not updated_project:
-            raise HTTPException(status_code=404, detail="Project not found")
+            raise HTTPException(status_code=500, detail="Failed to update project")
         return updated_project
 
-    async def delete_project(self, project_id: int, current_user_id: int) -> bool:
-        existing_project = await self.get_project(project_id)
-        if existing_project.founder_id != current_user_id:
+    async def delete_project(self, project_id: int, current_user_id: int) -> None:
+        project = await self.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        if project.founder_id != current_user_id:
             raise HTTPException(
                 status_code=403, detail="Not authorized to delete this project"
             )
 
-        try:
-            deleted = await self.project_repo.delete(project_id)
-            if not deleted:
-                raise HTTPException(status_code=404, detail="Project not found")
-            return deleted
-        except SQLAlchemyError as e:
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        deleted = await self.project_repo.delete(project_id)
+        if not deleted:
+            raise HTTPException(status_code=500, detail="Failed to delete project")
 
     async def list_projects(self) -> List[Project]:
         try:
@@ -77,3 +83,8 @@ class ProjectService:
             return await self.project_repo.list_by_founder(founder_id)
         except SQLAlchemyError as e:
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    async def get_project_by_title_and_founder(
+        self, title: str, founder_id: int
+    ) -> Optional[Project]:
+        return await self.project_repo.get_by_title_and_founder(title, founder_id)

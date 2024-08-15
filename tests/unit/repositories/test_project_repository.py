@@ -4,7 +4,8 @@ from sqlalchemy import select
 from app.repositories.project_repository import ProjectRepository
 from app.models.project import Project
 from app.models.user import User
-from sqlalchemy.exc import IntegrityError
+from app.schemas.project import ProjectCreate, ProjectUpdate
+from sqlalchemy.exc import SQLAlchemyError
 
 
 @pytest.mark.asyncio
@@ -28,7 +29,7 @@ class TestProjectRepository:
             "description": "This is a test project",
             "founder_id": test_user.id,
         }
-        project = await project_repo.create(Project(**project_data))
+        project = await project_repo.create(project_data)
         assert project.id is not None
         assert project.title == project_data["title"]
         assert project.description == project_data["description"]
@@ -40,7 +41,7 @@ class TestProjectRepository:
             "description": "This project will be retrieved",
             "founder_id": test_user.id,
         }
-        created_project = await project_repo.create(Project(**project_data))
+        created_project = await project_repo.create(project_data)
         retrieved_project = await project_repo.get(created_project.id)
         assert retrieved_project is not None
         assert retrieved_project.id == created_project.id
@@ -67,7 +68,7 @@ class TestProjectRepository:
             },
         ]
         for data in project_data_list:
-            await project_repo.create(Project(**data))
+            await project_repo.create(data)
 
         projects = await project_repo.list()
         assert len(projects) >= 3  # 기존 프로젝트가 있을 수 있으므로 '>=' 사용
@@ -81,7 +82,7 @@ class TestProjectRepository:
             "description": "Initial description",
             "founder_id": test_user.id,
         }
-        project = await project_repo.create(Project(**project_data))
+        project = await project_repo.create(project_data)
 
         updated_data = {"title": "Updated Title", "description": "Updated description"}
         updated_project = await project_repo.update(project.id, updated_data)
@@ -96,9 +97,10 @@ class TestProjectRepository:
             "description": "This project will be deleted",
             "founder_id": test_user.id,
         }
-        project = await project_repo.create(Project(**project_data))
+        project = await project_repo.create(project_data)
 
-        await project_repo.delete(project.id)
+        deleted = await project_repo.delete(project.id)
+        assert deleted is True
         deleted_project = await project_repo.get(project.id)
         assert deleted_project is None
 
@@ -110,7 +112,7 @@ class TestProjectRepository:
             "description": "Testing relationship",
             "founder_id": test_user.id,
         }
-        project = await project_repo.create(Project(**project_data))
+        project = await project_repo.create(project_data)
 
         # Refresh the session to ensure we have the latest data
         await db_session.refresh(project)
@@ -126,7 +128,46 @@ class TestProjectRepository:
             "description": "This title will be duplicated",
             "founder_id": test_user.id,
         }
-        await project_repo.create(Project(**project_data))
+        await project_repo.create(project_data)
 
-        with pytest.raises(IntegrityError):
-            await project_repo.create(Project(**project_data))
+        with pytest.raises(SQLAlchemyError):
+            await project_repo.create(project_data)
+
+    async def test_get_by_title_and_founder(
+        self, project_repo: ProjectRepository, test_user: User
+    ):
+        project_data = {
+            "title": "Unique Title",
+            "description": "This is a unique project",
+            "founder_id": test_user.id,
+        }
+        created_project = await project_repo.create(project_data)
+
+        retrieved_project = await project_repo.get_by_title_and_founder(
+            project_data["title"], test_user.id
+        )
+        assert retrieved_project is not None
+        assert retrieved_project.id == created_project.id
+        assert retrieved_project.title == project_data["title"]
+
+    async def test_list_by_founder(
+        self, project_repo: ProjectRepository, test_user: User
+    ):
+        project_data_list = [
+            {
+                "title": "Founder Project 1",
+                "description": "Description 1",
+                "founder_id": test_user.id,
+            },
+            {
+                "title": "Founder Project 2",
+                "description": "Description 2",
+                "founder_id": test_user.id,
+            },
+        ]
+        for data in project_data_list:
+            await project_repo.create(data)
+
+        projects = await project_repo.list_by_founder(test_user.id)
+        assert len(projects) >= 2
+        assert all(p.founder_id == test_user.id for p in projects)
