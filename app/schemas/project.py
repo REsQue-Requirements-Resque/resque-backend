@@ -45,7 +45,7 @@ class ProjectBase(BaseModel):
 
 
 class ProjectCreate(ProjectBase):
-    pass
+    title: str
 
 
 class ProjectUpdate(ProjectBase):
