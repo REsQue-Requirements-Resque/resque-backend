@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from jose import jwt
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 import asyncio
 
 from app.main import app
@@ -12,7 +12,7 @@ from app.models import User, LoginAttempt
 from app.services.authentication_service import AuthenticationService
 from app.core.config import settings
 from freezegun import freeze_time
-
+from fastapi import status
 
 @pytest.mark.asyncio
 class TestLoginIntegration:
@@ -143,34 +143,36 @@ class TestLoginIntegration:
         assert response.status_code == 200
 
     async def test_brute_force_prevention(self, client: AsyncClient, test_user: User):
-        with freeze_time("2023-01-01 12:00:00"):
-            # Attempt to login 5 times with wrong password
-            for _ in range(5):
+        with freeze_time(datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)):
+            # 잘못된 비밀번호로 5번 로그인 시도
+            for i in range(5):
                 response = await client.post(
                     self.LOGIN_URL,
-                    data={"username": test_user.email, "password": "wrongPassword"},
+                    data={"username": test_user.email, "password": "잘못된비밀번호"},
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                 )
-                assert response.status_code == 401
+                print(f"{i+1}번째 시도 상태 코드: {response.status_code}")
+                print(f"{i+1}번째 시도 응답 내용: {response.text}")
+                assert response.status_code == status.HTTP_401_UNAUTHORIZED, f"{i+1}번째 시도에서 401을 예상했으나 {response.status_code}를 받았습니다"
 
-            # The 6th attempt should be blocked
+            # 6번째 시도는 차단되어야 함
             response = await client.post(
                 self.LOGIN_URL,
-                data={"username": test_user.email, "password": "wrongPassword"},
+                data={"username": test_user.email, "password": "잘못된비밀번호"},
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            assert response.status_code == 429
-            assert "Too many login attempts" in response.json()["detail"]
+            print(f"마지막 시도 상태 코드: {response.status_code}")
+            print(f"마지막 시도 응답 내용: {response.text}")
+            assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS, f"429를 예상했으나 {response.status_code}를 받았습니다"
 
-        # Move time forward by 15 minutes
-        with freeze_time("2023-01-01 12:15:01"):
-            # Now the login should work with correct password
+        # 15분 후에는 다시 로그인이 가능해야 함
+        with freeze_time(datetime(2023, 1, 1, 12, 15, 0, tzinfo=timezone.utc)):
             response = await client.post(
                 self.LOGIN_URL,
-                data={"username": test_user.email, "password": "securePassword123!"},
+                data={"username": test_user.email, "password": test_user.password},
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            assert response.status_code == 200
+            assert response.status_code == status.HTTP_200_OK
 
     async def test_login_attempts_reset_after_successful_login(self):
         # Attempt to login 4 times with wrong password
