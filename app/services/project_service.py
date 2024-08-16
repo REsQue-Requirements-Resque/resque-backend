@@ -72,6 +72,8 @@ class ProjectService:
         if not deleted:
             raise HTTPException(status_code=500, detail="Failed to delete project")
 
+        return True
+
     async def list_projects(self) -> List[Project]:
         try:
             return await self.project_repo.list()
