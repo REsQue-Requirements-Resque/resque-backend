@@ -1,6 +1,7 @@
 from pydantic import BaseModel, field_validator, ConfigDict, Field, model_validator
 from app.utils.validator import validate_field
 import re
+from typing import Dict, Any
 
 
 class ProjectBase(BaseModel):
@@ -49,7 +50,12 @@ class ProjectCreate(ProjectBase):
 
 
 class ProjectUpdate(ProjectBase):
-    pass
+    @model_validator(mode="before")
+    @classmethod
+    def check_at_least_one_field(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if not any(values.values()):
+            raise ValueError("At least one field must be provided for update")
+        return values
 
 
 class ProjectResponse(BaseModel):
