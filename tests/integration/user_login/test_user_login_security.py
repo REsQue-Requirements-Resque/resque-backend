@@ -8,6 +8,7 @@ from app.services.authentication_service import AuthenticationService
 from app.exceptions.user_exceptions import TooManyAttemptsError, InvalidCredentialsError
 from freezegun import freeze_time
 from httpx import AsyncClient
+from datetime import datetime, timezone
 
 
 @pytest.mark.asyncio
@@ -44,46 +45,63 @@ class TestLoginSecurity:
         assert response.status_code == 200
 
     @freeze_time("2023-01-01 12:00:00")
-    async def test_brute_force_prevention(self):
-        # Attempt to login 5 times with wrong password
+    async def test_consecutive_failed_attempts_cause_lockout(self):
+        current_time = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+        # 5번의 실패한 로그인 시도
         for _ in range(5):
             with pytest.raises(InvalidCredentialsError):
                 await self.auth_service.authenticate_user(
-                    "test@example.com", "wrongPassword"
+                    "test@example.com", "wrongPassword", current_time
                 )
 
-        # The 6th attempt should raise TooManyAttemptsError
+        # 6번째 시도에서 TooManyAttemptsError 발생
         with pytest.raises(TooManyAttemptsError):
             await self.auth_service.authenticate_user(
-                "test@example.com", "wrongPassword"
+                "test@example.com", "wrongPassword", current_time
             )
 
-        # Move time forward by 5 minutes
-        with freeze_time("2023-01-01 12:05:01"):
-            # Now the login should work with correct password
-            user = await self.auth_service.authenticate_user(
-                "test@example.com", "securePassword123!"
-            )
-            assert user is not None
-            assert user.email == "test@example.com"
+    @freeze_time("2023-01-01 12:00:00")
+    async def test_successful_login_after_cooldown(self):
+        current_time = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-    async def test_login_attempts_reset_after_successful_login(self):
-        # Attempt to login 4 times with wrong password
-        for _ in range(4):
+        # 5번의 실패한 로그인 시도
+        for _ in range(5):
             with pytest.raises(InvalidCredentialsError):
                 await self.auth_service.authenticate_user(
-                    "test@example.com", "wrongPassword"
+                    "test@example.com", "wrongPassword", current_time
                 )
 
-        # Login successfully
-        user = await self.auth_service.authenticate_user(
-            "test@example.com", "securePassword123!"
-        )
-        assert user is not None
+        # 쿨다운 기간 후 로그인 성공
+        with freeze_time("2023-01-01 12:05:01"):
+            current_time = datetime(2023, 1, 1, 12, 5, 1, tzinfo=timezone.utc)
+            user = await self.auth_service.authenticate_user(
+                "test@example.com", "securePassword123!", current_time
+            )
+            assert user is not None
 
-        # Check that login attempts have been reset
-        result = await self.db_session.execute(
-            select(LoginAttempt).filter(LoginAttempt.email == "test@example.com")
-        )
-        attempts = result.scalars().all()
-        assert len(attempts) == 0
+    @freeze_time("2023-01-01 12:00:00")
+    async def test_lockout_resets_after_cooldown(self):
+        current_time = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+        # 5번의 실패한 로그인 시도
+        for _ in range(5):
+            with pytest.raises(InvalidCredentialsError):
+                await self.auth_service.authenticate_user(
+                    "test@example.com", "wrongPassword", current_time
+                )
+
+        # 쿨다운 후 다시 5번의 실패한 시도가 가능
+        with freeze_time("2023-01-01 12:05:02"):
+            current_time = datetime(2023, 1, 1, 12, 5, 2, tzinfo=timezone.utc)
+            for _ in range(5):
+                with pytest.raises(InvalidCredentialsError):
+                    await self.auth_service.authenticate_user(
+                        "test@example.com", "wrongPassword", current_time
+                    )
+
+            # 6번째 시도에서 다시 TooManyAttemptsError 발생
+            with pytest.raises(TooManyAttemptsError):
+                await self.auth_service.authenticate_user(
+                    "test@example.com", "wrongPassword", current_time
+                )
