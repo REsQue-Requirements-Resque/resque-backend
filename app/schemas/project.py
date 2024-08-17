@@ -1,7 +1,7 @@
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.utils.validator import validate_field
 
@@ -47,11 +47,40 @@ class ProjectBase(BaseModel):
         return value
 
 
-class ProjectCreate(ProjectBase):
+class CreateSchema(Protocol):
+    Create: type[BaseModel]
+
+
+class UpdateSchema(Protocol):
+    Update: type[BaseModel]
+
+
+class ResponseSchema(Protocol):
+    Response: type[BaseModel]
+
+
+class BaseSchema(Protocol):
+    Create: type[CreateSchema]
+    Update: type[UpdateSchema]
+    Response: type[ResponseSchema]
+
+
+class ProjectCreate(ProjectBase, CreateSchema):
     title: str
+    Create: type[BaseModel] = None  # This will be set to ProjectCreate itself
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.Create = cls
 
 
-class ProjectUpdate(ProjectBase):
+class ProjectUpdate(ProjectBase, UpdateSchema):
+    Update: type[BaseModel] = None  # This will be set to ProjectUpdate itself
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.Update = cls
+
     @model_validator(mode="before")
     @classmethod
     def check_at_least_one_field(cls, values: Dict[str, Any]) -> Dict[str, Any]:
@@ -60,10 +89,21 @@ class ProjectUpdate(ProjectBase):
         return values
 
 
-class ProjectResponse(BaseModel):
+class ProjectResponse(BaseModel, ResponseSchema):
     id: int
     title: str
     description: str | None = None
     founder_id: int
+    Response: type[BaseModel] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.Response = cls
+
+
+class ProjectSchema(BaseSchema):
+    Create = ProjectCreate
+    Update = ProjectUpdate
+    Response = ProjectResponse
