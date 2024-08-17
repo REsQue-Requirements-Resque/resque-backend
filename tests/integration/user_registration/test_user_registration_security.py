@@ -1,10 +1,11 @@
 import pytest
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from app.schemas.user import UserCreate
+
+from app.core.security import get_password_hash, verify_password
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
-from app.core.security import verify_password, get_password_hash
+from app.schemas.user import UserCreate
 
 
 @pytest.mark.asyncio

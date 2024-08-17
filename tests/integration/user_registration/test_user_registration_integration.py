@@ -1,10 +1,12 @@
+import logging
+
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.models.user import User
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.security import verify_password
-import logging
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 

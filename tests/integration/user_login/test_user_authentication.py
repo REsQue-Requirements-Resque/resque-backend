@@ -1,10 +1,11 @@
 import pytest
 from sqlalchemy import select
-from app.models import User
+
 from app.core.security import get_password_hash, verify_password
-from app.services.authentication_service import AuthenticationService
 from app.exceptions.user_exceptions import InvalidCredentialsError, TooManyAttemptsError
+from app.models import User
 from app.schemas.user import UserLogin
+from app.services.authentication_service import AuthenticationService
 
 
 @pytest.mark.asyncio

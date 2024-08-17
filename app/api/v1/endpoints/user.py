@@ -1,26 +1,28 @@
+import logging
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.base import get_async_db
-from app.schemas.user import UserCreate, UserResponse
-from app.repositories.user_repository import UserRepository
+
+from app.core.config import settings
 from app.core.security import (
-    create_access_token,
-    verify_password,
-    get_current_user,
     check_brute_force,
     clear_login_attempts,
+    create_access_token,
+    get_current_user,
+    verify_password,
 )
+from app.db.base import get_async_db
 from app.exceptions.user_exceptions import (
-    DuplicateEmailError,
     DatabaseError,
+    DuplicateEmailError,
     InvalidCredentialsError,
     TooManyAttemptsError,
 )
-from sqlalchemy.exc import SQLAlchemyError
-import logging
-from datetime import timedelta
-from app.core.config import settings
+from app.repositories.user_repository import UserRepository
+from app.schemas.user import UserCreate, UserResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

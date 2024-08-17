@@ -1,6 +1,8 @@
 import pytest
 from pydantic import ValidationError
+
 from app.schemas.user import UserLogin
+
 
 @pytest.mark.unit
 class TestUserLoginValidation:
@@ -53,7 +55,9 @@ class TestUserLoginValidation:
     def test_password_field_empty(self):
         data = self.get_valid_data()
         data["password"] = ""
-        with pytest.raises(ValidationError, match="String should have at least 8 characters"):
+        with pytest.raises(
+            ValidationError, match="String should have at least 8 characters"
+        ):
             UserLogin(**data)
 
     def test_email_whitespace_stripped(self):

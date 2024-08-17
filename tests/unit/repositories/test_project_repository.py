@@ -1,11 +1,12 @@
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.repositories.project_repository import ProjectRepository
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.project import Project
 from app.models.user import User
+from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate
-from sqlalchemy.exc import SQLAlchemyError
 
 
 @pytest.mark.asyncio

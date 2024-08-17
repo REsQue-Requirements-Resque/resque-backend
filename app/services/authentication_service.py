@@ -1,16 +1,18 @@
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+from pydantic import ValidationError
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, func
-from app.models import User, LoginAttempt
+
 from app.core.security import verify_password
 from app.exceptions.user_exceptions import (
+    DatabaseError,
     InvalidCredentialsError,
     TooManyAttemptsError,
-    DatabaseError,
 )
-from pydantic import ValidationError
+from app.models import LoginAttempt, User
 from app.schemas.user import UserLogin
-from datetime import datetime, timedelta, timezone
 
 
 class AuthenticationService:
@@ -24,7 +26,7 @@ class AuthenticationService:
         # 쿨다운 기간이 지난 로그인 시도 삭제
         delete_query = delete(LoginAttempt).where(
             LoginAttempt.email == email,
-            LoginAttempt.attempt_time <= current_time - self.cooldown_period
+            LoginAttempt.attempt_time <= current_time - self.cooldown_period,
         )
         await self.db_session.execute(delete_query)
         await self.db_session.commit()
@@ -51,9 +53,7 @@ class AuthenticationService:
         self, email: str, password: str, current_time: datetime
     ) -> Optional[User]:
         if not await self.check_login_attempts(email, current_time):
-            raise TooManyAttemptsError(
-                "로그인 시도가 너무 많습니다. 나중에 다시 시도해 주세요."
-            )
+            raise TooManyAttemptsError("로그인 시도가 너무 많습니다. 나중에 다시 시도해 주세요.")
 
         # 사용자 인증 로직...
         user = await self.db_session.execute(select(User).where(User.email == email))

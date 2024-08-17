@@ -1,18 +1,20 @@
-import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from jose import jwt
-from datetime import timedelta, datetime, timezone
 import asyncio
+from datetime import datetime, timedelta, timezone
 
-from app.main import app
-from app.core.security import get_password_hash, verify_password, create_access_token
-from app.models import User, LoginAttempt
-from app.services.authentication_service import AuthenticationService
-from app.core.config import settings
-from freezegun import freeze_time
+import pytest
 from fastapi import status
+from freezegun import freeze_time
+from httpx import AsyncClient
+from jose import jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.security import create_access_token, get_password_hash, verify_password
+from app.main import app
+from app.models import LoginAttempt, User
+from app.services.authentication_service import AuthenticationService
+
 
 @pytest.mark.asyncio
 class TestLoginIntegration:
@@ -37,7 +39,8 @@ class TestLoginIntegration:
             select(User).filter(User.email == test_user_data["email"])
         )
         created_user = result.scalar_one_or_none()
-        assert created_user is not None, f"Test user was not created: {test_user_data["email"]}"
+        assert created_user is not None
+        assert created_user.email == test_user_data["email"]
         print(f"Test user created: {created_user.email}")
 
         yield
@@ -83,7 +86,10 @@ class TestLoginIntegration:
     async def test_login_failure(self):
         response = await self.client.post(
             self.LOGIN_URL,
-            data={"username": self.get_test_user_data()["email"], "password": "wrongPassword"},
+            data={
+                "username": self.get_test_user_data()["email"],
+                "password": "wrongPassword",
+            },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         assert response.status_code == 401
@@ -131,7 +137,7 @@ class TestLoginIntegration:
 
         assert verify_password(password, hashed_password)
         assert not verify_password("wrongPassword", hashed_password)
-        
+
     async def test_https_secure_connection(self, httpsclient: AsyncClient):
         data = self.get_test_user_request()
         response = await httpsclient.post(
@@ -153,7 +159,9 @@ class TestLoginIntegration:
                 )
                 print(f"{i+1}번째 시도 상태 코드: {response.status_code}")
                 print(f"{i+1}번째 시도 응답 내용: {response.text}")
-                assert response.status_code == status.HTTP_401_UNAUTHORIZED, f"{i+1}번째 시도에서 401을 예상했으나 {response.status_code}를 받았습니다"
+                assert (
+                    response.status_code == status.HTTP_401_UNAUTHORIZED
+                ), f"{i+1}번째 시도에서 401을 예상했으나 {response.status_code}를 받았습니다"
 
             # 6번째 시도는 차단되어야 함
             response = await client.post(
@@ -163,7 +171,9 @@ class TestLoginIntegration:
             )
             print(f"마지막 시도 상태 코드: {response.status_code}")
             print(f"마지막 시도 응답 내용: {response.text}")
-            assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS, f"429를 예상했으나 {response.status_code}를 받았습니다"
+            assert (
+                response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+            ), f"429를 예상했으나 {response.status_code}를 받았습니다"
 
         # 15분 후에는 다시 로그인이 가능해야 함
         with freeze_time(datetime(2023, 1, 1, 12, 15, 0, tzinfo=timezone.utc)):

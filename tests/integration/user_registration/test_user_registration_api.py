@@ -1,10 +1,11 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+
+from app.core.security import verify_password
 from app.main import app
 from app.models.user import User
-from app.core.security import verify_password
 
 
 @pytest.mark.asyncio

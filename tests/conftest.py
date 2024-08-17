@@ -1,17 +1,19 @@
+import ssl
+import uuid
+
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from app.db.base import Base, get_async_db
-from app.core.config import settings
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.core.config import settings
+from app.core.security import create_access_token, get_password_hash
+from app.db.base import Base, get_async_db
 from app.main import app
 from app.models import User
-from app.core.security import get_password_hash
-import uuid
-import ssl
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate
-from app.core.security import create_access_token
+
 
 @pytest.fixture(scope="session")
 def engine():

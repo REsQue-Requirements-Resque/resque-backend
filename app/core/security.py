@@ -1,17 +1,17 @@
-import bcrypt
-from datetime import datetime, timedelta
-from fastapi.security import OAuth2PasswordBearer
-from app.core.config import settings
-from fastapi import Depends, HTTPException, status
-from app.db.base import get_async_db, AsyncSession
-from app.models import User
-from app.schemas.user import UserResponse
-from sqlalchemy.future import select
-from app.models import LoginAttempt
 import logging
+from datetime import datetime, timedelta
+
+import bcrypt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import ExpiredSignatureError, JWTError, jwt
 from sqlalchemy import delete
-from jose import jwt, JWTError, ExpiredSignatureError
-from fastapi import HTTPException, status
+from sqlalchemy.future import select
+
+from app.core.config import settings
+from app.db.base import AsyncSession, get_async_db
+from app.models import LoginAttempt, User
+from app.schemas.user import UserResponse
 
 logger = logging.getLogger(__name__)
 

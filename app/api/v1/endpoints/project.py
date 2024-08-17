@@ -1,14 +1,16 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.base import get_async_db
-from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
-from app.services.project_service import ProjectService
-from app.repositories.project_repository import ProjectRepository
-from app.core.security import get_current_user
-from app.models.user import User
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.security import get_current_user
+from app.db.base import get_async_db
+from app.models.user import User
+from app.repositories.project_repository import ProjectRepository
+from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
+from app.services.project_service import ProjectService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

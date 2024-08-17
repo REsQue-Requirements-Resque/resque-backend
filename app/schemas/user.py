@@ -1,5 +1,7 @@
 import re
+
 from pydantic import BaseModel, EmailStr, Field, field_validator
+
 from app.utils.validator import validate_field
 
 

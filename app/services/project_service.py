@@ -1,9 +1,11 @@
-from app.repositories.project_repository import ProjectRepository
-from app.models.project import Project
-from app.schemas.project import ProjectCreate, ProjectUpdate
 from typing import List, Optional
+
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
+
+from app.models.project import Project
+from app.repositories.project_repository import ProjectRepository
+from app.schemas.project import ProjectCreate, ProjectUpdate
 
 
 class ProjectService:

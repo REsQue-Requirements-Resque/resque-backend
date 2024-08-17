@@ -1,7 +1,9 @@
-from pydantic import BaseModel, field_validator, ConfigDict, Field, model_validator
-from app.utils.validator import validate_field
 import re
-from typing import Dict, Any
+from typing import Any, Dict
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.utils.validator import validate_field
 
 
 class ProjectBase(BaseModel):

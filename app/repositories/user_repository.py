@@ -1,10 +1,11 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.security import get_password_hash
+from app.exceptions.user_exceptions import DatabaseError, DuplicateEmailError
 from app.models.user import User
 from app.schemas.user import UserCreate
-from app.exceptions.user_exceptions import DuplicateEmailError, DatabaseError
-from app.core.security import get_password_hash
 
 
 class UserRepository:

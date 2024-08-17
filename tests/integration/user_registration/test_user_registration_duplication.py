@@ -1,9 +1,10 @@
 import pytest
-from sqlalchemy import select, delete
-from app.schemas.user import UserCreate
+from sqlalchemy import delete, select
+
+from app.exceptions.user_exceptions import DatabaseError, DuplicateEmailError
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
-from app.exceptions.user_exceptions import DuplicateEmailError, DatabaseError
+from app.schemas.user import UserCreate
 
 
 @pytest.mark.asyncio

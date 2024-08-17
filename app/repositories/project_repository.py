@@ -1,9 +1,11 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
-from sqlalchemy.orm import selectinload
-from app.models.project import Project
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.project import Project
 
 
 class ProjectRepository:

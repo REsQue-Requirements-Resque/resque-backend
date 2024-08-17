@@ -1,11 +1,12 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+
+from app.core.security import create_access_token
 from app.main import app
 from app.models.project import Project
 from app.models.user import User
-from app.core.security import create_access_token
 
 
 @pytest.mark.asyncio

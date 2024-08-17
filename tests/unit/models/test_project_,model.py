@@ -1,10 +1,12 @@
+from datetime import datetime
+
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
+
 from app.models.project import Project
 from app.models.user import User
-from datetime import datetime
-from sqlalchemy.exc import IntegrityError
 
 
 @pytest.mark.asyncio

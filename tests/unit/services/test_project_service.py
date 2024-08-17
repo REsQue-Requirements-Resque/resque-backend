@@ -1,10 +1,12 @@
+from unittest.mock import ANY, AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, ANY
 from fastapi import HTTPException
-from app.services.project_service import ProjectService
-from app.schemas.project import ProjectCreate, ProjectUpdate
+
 from app.models.project import Project
 from app.repositories.project_repository import ProjectRepository
+from app.schemas.project import ProjectCreate, ProjectUpdate
+from app.services.project_service import ProjectService
 
 
 @pytest.fixture
