@@ -19,7 +19,7 @@ class UserRepository(BaseRepository[User]):
                 raise DuplicateEmailError()
 
             hashed_password = get_password_hash(user_data.password)
-            new_user_data = user_data.dict(exclude={"password"})
+            new_user_data = user_data.model_dump(exclude={"password"})
             new_user_data["hashed_password"] = hashed_password
 
             return await self.create(new_user_data)
