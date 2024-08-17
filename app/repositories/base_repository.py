@@ -1,59 +1,60 @@
-from typing import Any, Dict, List, Optional, TypeVar, Generic
-from sqlalchemy import select, update, delete
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Generic, TypeVar, Type, List, Any
+from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
-from pydantic import BaseModel
+from app.models.base_model import BaseModel
+from app.repositories.base_repository import BaseRepository
+from app.schemas.base_schema import BaseSchema
 
-T = TypeVar("T")
+ModelType = TypeVar("ModelType", bound=BaseModel)
+SchemaType = TypeVar("SchemaType", bound=BaseSchema)
 
 
-class BaseRepository(Generic[T]):
-    def __init__(self, db_session: AsyncSession, model: T):
-        self.db_session = db_session
-        self.model: BaseModel = model
+class BaseService(Generic[ModelType, SchemaType]):
+    def __init__(self, repository: BaseRepository[ModelType], schema: Type[SchemaType]):
+        self.repository = repository
+        self.schema = schema
 
-    async def create(self, data: Dict[str, Any]) -> T:
+    async def create(
+        self, obj_in: SchemaType.CreateSchema
+    ) -> SchemaType.ResponseSchema:
         try:
-            db_obj = self.model(**data)
-            self.db_session.add(db_obj)
-            await self.db_session.commit()
-            await self.db_session.refresh(db_obj)
-            return db_obj
+            obj_dict = obj_in.model_dump()
+            db_obj = await self.repository.create(obj_dict)
+            return self.schema.ResponseSchema.model_validate(db_obj)
         except SQLAlchemyError as e:
-            await self.db_session.rollback()
-            raise e
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    async def get(self, id: Any) -> Optional[T]:
-        stmt = select(self.model).where(self.model.id == id)
-        result = await self.db_session.execute(stmt)
-        return result.scalar_one_or_none()
+    async def get(self, id: Any) -> SchemaType.ResponseSchema:
+        obj = await self.repository.get(id)
+        if not obj:
+            raise HTTPException(status_code=404, detail="Object not found")
+        return self.schema.ResponseSchema.model_validate(obj)
 
-    async def list(self) -> List[T]:
-        stmt = select(self.model)
-        result = await self.db_session.execute(stmt)
-        return list(result.scalars().all())
+    async def update(
+        self, id: Any, obj_in: SchemaType.UpdateSchema
+    ) -> SchemaType.ResponseSchema:
+        update_data = obj_in.model_dump(exclude_unset=True)
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No update data provided")
 
-    async def update(self, id: Any, data: Dict[str, Any]) -> Optional[T]:
-        try:
-            stmt = (
-                update(self.model)
-                .where(self.model.id == id)
-                .values(**data)
-                .returning(self.model)
+        updated_obj = await self.repository.update(id, update_data)
+        if not updated_obj:
+            raise HTTPException(
+                status_code=404, detail="Object not found or update failed"
             )
-            result = await self.db_session.execute(stmt)
-            await self.db_session.commit()
-            return result.scalar_one_or_none()
-        except SQLAlchemyError as e:
-            await self.db_session.rollback()
-            raise e
+        return self.schema.ResponseSchema.model_validate(updated_obj)
 
     async def delete(self, id: Any) -> bool:
+        deleted = await self.repository.delete(id)
+        if not deleted:
+            raise HTTPException(
+                status_code=404, detail="Object not found or delete failed"
+            )
+        return True
+
+    async def list(self) -> List[SchemaType.ResponseSchema]:
         try:
-            stmt = delete(self.model).where(self.model.id == id)
-            result = await self.db_session.execute(stmt)
-            await self.db_session.commit()
-            return result.rowcount > 0
+            objs = await self.repository.list()
+            return [self.schema.ResponseSchema.model_validate(obj) for obj in objs]
         except SQLAlchemyError as e:
-            await self.db_session.rollback()
-            raise e
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
