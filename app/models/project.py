@@ -5,20 +5,16 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
-    Integer,
     String,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
-from app.db.base import Base
+from app.models.base_model import BaseModel
 
 
-class Project(Base):
-    __tablename__ = "projects"
-
-    id = Column(Integer, primary_key=True, index=True)
-    founder_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+class Project(BaseModel):
+    founder_id = Column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title = Column(String, index=True)
     description = Column(String, nullable=True)
 
