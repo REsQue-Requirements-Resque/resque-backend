@@ -11,132 +11,131 @@ SchemaType = TypeVar("SchemaType", bound=BaseSchema)
 ServiceType = TypeVar("ServiceType", bound=BaseService)
 
 
-class BaseCrudEndpoint(Generic[ModelType, SchemaType, ServiceType]):
+class EndpointAction:
     def __init__(
         self,
-        router: APIRouter,
-        service_class: Type[ServiceType],
-        schema: Type[SchemaType],
-        prefix: str,
+        func: Callable,
+        methods: List[str],
+        detail: bool = False,
+        response_model: Any = None,
+        status_code: int = status.HTTP_200_OK,
+        url_path: str = None,
     ):
+        self.func = func
+        self.methods = methods
+        self.detail = detail
+        self.response_model = response_model
+        self.status_code = status_code
+        self.url_path = url_path
+
+
+class BaseCrudEndpoint(Generic[ModelType, SchemaType, ServiceType]):
+    service_class: Type[ServiceType]
+    schema: Type[SchemaType]
+
+    def __init__(self, router: APIRouter, prefix: str):
         self.router = router
-        self.service_class = service_class
-        self.schema = schema
         self.prefix = prefix
         self.urls = {
             "list": f"{self.prefix}",
             "detail": f"{self.prefix}/{{id}}",
         }
+        self.actions: Dict[str, EndpointAction] = {}
+        self.setup_default_actions()
         self.register_routes()
 
     def get_service(self, db: AsyncSession = Depends(get_async_db)) -> ServiceType:
         return self.service_class(db)
 
+    def setup_default_actions(self):
+        self.actions = {
+            "list": EndpointAction(
+                self.list, ["GET"], False, List[self.schema.ResponseSchema]
+            ),
+            "create": EndpointAction(
+                self.create,
+                ["POST"],
+                False,
+                self.schema.ResponseSchema,
+                status.HTTP_201_CREATED,
+            ),
+            "retrieve": EndpointAction(
+                self.get, ["GET"], True, self.schema.ResponseSchema
+            ),
+            "update": EndpointAction(
+                self.update, ["PUT"], True, self.schema.ResponseSchema
+            ),
+            "delete": EndpointAction(
+                self.delete, ["DELETE"], True, None, status.HTTP_204_NO_CONTENT
+            ),
+        }
+
     def register_routes(self):
-        self.register_cruds()
-        self.register_custom_actions()
+        for action_name, action in self.actions.items():
+            if action.detail:
+                base_path = self.urls["detail"]
+            else:
+                base_path = self.urls["list"]
 
-    def register_cruds(self):
-        self.register_create()
-        self.register_get()
-        self.register_update()
-        self.register_delete()
-        self.register_list()
+            if action.url_path:
+                path = f"{base_path}/{action.url_path}"
+            elif action_name not in ["list", "create", "retrieve", "update", "delete"]:
+                path = f"{base_path}/{action_name}"
+            else:
+                path = base_path
 
-    def register_create(self):
-        @self.router.post(
-            self.urls["list"],
-            response_model=self.schema.ResponseSchema,
-            status_code=status.HTTP_201_CREATED,
-        )
-        async def create(
-            obj_in: self.schema.CreateSchema,
-            service: ServiceType = Depends(self.get_service),
-        ) -> self.schema.ResponseSchema:
-            return await self.create(obj_in, service)
+            self.router.add_api_route(
+                path,
+                action.func,
+                methods=action.methods,
+                response_model=action.response_model,
+                status_code=action.status_code,
+            )
 
-    def register_get(self):
-        @self.router.get(self.urls["detail"], response_model=self.schema.ResponseSchema)
-        async def get(
-            id: int, service: ServiceType = Depends(self.get_service)
-        ) -> self.schema.ResponseSchema:
-            return await self.get(id, service)
-
-    def register_update(self):
-        @self.router.put(self.urls["detail"], response_model=self.schema.ResponseSchema)
-        async def update(
-            id: int,
-            obj_in: self.schema.UpdateSchema,
-            service: ServiceType = Depends(self.get_service),
-        ) -> self.schema.ResponseSchema:
-            return await self.update(id, obj_in, service)
-
-    def register_delete(self):
-        @self.router.delete(self.urls["detail"], status_code=status.HTTP_204_NO_CONTENT)
-        async def delete(
-            id: int, service: ServiceType = Depends(self.get_service)
-        ) -> None:
-            await self.delete(id, service)
-
-    def register_list(self):
-        @self.router.get(
-            self.urls["list"], response_model=List[self.schema.ResponseSchema]
-        )
-        async def list(
-            service: ServiceType = Depends(self.get_service),
-        ) -> List[self.schema.ResponseSchema]:
-            return await self.list(service)
-
-    def register_custom_actions(self):
-        # This method should be overridden in child classes to add custom actions
-        pass
-
-    async def create(
-        self, obj_in: SchemaType.CreateSchema, service: ServiceType
-    ) -> SchemaType.ResponseSchema:
-        return await service.create(obj_in)
-
-    async def get(self, id: int, service: ServiceType) -> SchemaType.ResponseSchema:
-        return await service.get(id)
-
-    async def update(
-        self, id: int, obj_in: SchemaType.UpdateSchema, service: ServiceType
-    ) -> SchemaType.ResponseSchema:
-        return await service.update(id, obj_in)
-
-    async def delete(self, id: int, service: ServiceType) -> None:
-        await service.delete(id)
-
-    async def list(self, service: ServiceType) -> List[SchemaType.ResponseSchema]:
-        return await service.list()
-
-    def add_api_route(
-        self,
-        path: str,
-        endpoint: Callable,
-        methods: List[str],
-        status_code: int = 200,
+    @classmethod
+    def custom_action(
+        cls,
+        detail: bool = False,
+        methods: List[str] = ["GET"],
         response_model: Any = None,
-        **kwargs: Any,
+        status_code: int = status.HTTP_200_OK,
+        url_path: str = None,
     ):
-        self.router.add_api_route(
-            path,
-            endpoint,
-            methods=methods,
-            status_code=status_code,
-            response_model=response_model,
-            **kwargs,
-        )
-
-    def custom_action(self, detail: bool = False, methods: List[str] = ["GET"]):
         def decorator(func: Callable):
             action_name = func.__name__
-            path = (
-                f"{self.urls['detail']}/{action_name}"
-                if detail
-                else f"{self.urls['list']}/{action_name}"
+            cls.actions[action_name] = EndpointAction(
+                func, methods, detail, response_model, status_code, url_path
             )
-            self.add_api_route(path, func, methods=methods)
             return func
 
         return decorator
+
+    async def create(
+        self,
+        obj_in: SchemaType.CreateSchema,
+        service: ServiceType = Depends(get_service),
+    ) -> SchemaType.ResponseSchema:
+        return await service.create(obj_in)
+
+    async def get(
+        self, id: int, service: ServiceType = Depends(get_service)
+    ) -> SchemaType.ResponseSchema:
+        return await service.get(id)
+
+    async def update(
+        self,
+        id: int,
+        obj_in: SchemaType.UpdateSchema,
+        service: ServiceType = Depends(get_service),
+    ) -> SchemaType.ResponseSchema:
+        return await service.update(id, obj_in)
+
+    async def delete(
+        self, id: int, service: ServiceType = Depends(get_service)
+    ) -> None:
+        await service.delete(id)
+
+    async def list(
+        self, service: ServiceType = Depends(get_service)
+    ) -> List[SchemaType.ResponseSchema]:
+        return await service.list()
