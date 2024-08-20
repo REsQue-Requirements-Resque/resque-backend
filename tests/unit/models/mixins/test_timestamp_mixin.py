@@ -54,8 +54,9 @@ class TestTimestampMixin:
 
         queried_model = await db_session.get(TestModel, model.id)
         assert queried_model is not None
-        assert queried_model.created_at == datetime.now(timezone.utc)
-        assert queried_model.updated_at == datetime.now(timezone.utc)
+        expected_time = datetime(2023, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        assert queried_model.created_at == expected_time
+        assert queried_model.updated_at == expected_time
 
     @freeze_time("2023-01-01 00:00:00")
     async def test_update_timestamp(self, db_session):
