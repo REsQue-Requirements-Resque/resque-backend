@@ -1,6 +1,7 @@
-from sqlalchemy import Boolean
+from sqlalchemy import Boolean, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.declarative import declared_attr
+from datetime import datetime
 
 
 class SoftDeleteMixin:
@@ -26,3 +27,18 @@ class SoftDeleteMixin:
             Mapped[bool]: 삭제 여부를 나타내는 불리언 필드입니다.
         """
         return mapped_column(Boolean, default=False, nullable=False)
+
+    @declared_attr
+    def deleted_at(cls) -> Mapped[datetime]:
+        """소프트 삭제 시각 필드를 정의합니다.
+
+        이 필드는 인스턴스가 삭제된 시각을 나타내는 `DateTime` 타입의 필드입니다.
+
+        Returns:
+            Mapped[datetime]: 삭제 시각을 나타내는 `DateTime` 필드입니다
+        """
+        return mapped_column(
+            DateTime(timezone=True),
+            nullable=True,
+            default=None,
+        )
