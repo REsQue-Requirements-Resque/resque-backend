@@ -7,10 +7,8 @@ from datetime import datetime
 from app.models.mixins.soft_delete_mixin import SoftDeleteMixin
 from app.repositories.base_repository import BaseRepository
 
-ST = TypeVar("ST", bound=SoftDeleteMixin)
 
-
-class SoftDeleteBaseRepository(BaseRepository[ST]):
+class SoftDeleteBaseRepository(BaseRepository):
     """소프트 삭제 기능을 지원하는 기본 저장소 클래스입니다.
 
     이 클래스는 BaseRepository를 상속받아 소프트 삭제 기능을 추가합니다.
@@ -20,9 +18,21 @@ class SoftDeleteBaseRepository(BaseRepository[ST]):
         _model_class (Type[ST]): 이 저장소가 다루는 모델 클래스입니다.
     """
 
-    _model_class: Type[ST] = None
+    _model_class: SoftDeleteMixin = None
 
-    async def list(self) -> List[ST]:
+    def __init__(self, db_session: AsyncSession):
+        """SoftDeleteBaseRepository 클래스의 생성자입니다.
+
+        Args:
+            db_session (AsyncSession): 데이터베이스 세션입니다.
+        """
+        if self._model_class is None:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} must declare _model_class"
+            )
+        super().__init__(db_session)
+
+    async def list(self) -> List[SoftDeleteMixin]:
         """삭제되지 않은 모든 모델 인스턴스를 조회합니다.
 
         Returns:
@@ -32,7 +42,7 @@ class SoftDeleteBaseRepository(BaseRepository[ST]):
         result = await self.db_session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get(self, id: Any) -> Optional[ST]:
+    async def get(self, id: Any) -> Optional[SoftDeleteMixin]:
         """주어진 ID에 해당하는 삭제되지 않은 모델 인스턴스를 조회합니다.
 
         Args:
@@ -47,7 +57,7 @@ class SoftDeleteBaseRepository(BaseRepository[ST]):
         result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def delete(self, id: Any) -> Optional[ST]:
+    async def delete(self, id: Any) -> Optional[SoftDeleteMixin]:
         """주어진 ID에 해당하는 모델 인스턴스를 소프트 삭제합니다.
 
         Args:
@@ -76,7 +86,7 @@ class SoftDeleteBaseRepository(BaseRepository[ST]):
             await self.db_session.rollback()
             raise
 
-    async def hard_delete(self, id: Any) -> Optional[ST]:
+    async def hard_delete(self, id: Any) -> Optional[SoftDeleteMixin]:
         """주어진 ID에 해당하는 모델 인스턴스를 데이터베이스에서 완전히 삭제합니다.
 
         Args:
@@ -90,7 +100,7 @@ class SoftDeleteBaseRepository(BaseRepository[ST]):
         """
         return await super().delete(id)
 
-    async def list_all(self) -> List[ST]:
+    async def list_all(self) -> List[SoftDeleteMixin]:
         """삭제된 인스턴스를 포함한 모든 모델 인스턴스를 조회합니다.
 
         Returns:
@@ -100,7 +110,7 @@ class SoftDeleteBaseRepository(BaseRepository[ST]):
         result = await self.db_session.execute(stmt)
         return list(result.scalars().all())
 
-    async def restore(self, id: Any) -> Optional[ST]:
+    async def restore(self, id: Any) -> Optional[SoftDeleteMixin]:
         """소프트 삭제된 모델 인스턴스를 복원합니다.
 
         Args:
