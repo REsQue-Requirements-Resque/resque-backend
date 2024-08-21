@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from fastapi import HTTPException
 from typing import Any
 from app.models.user import User
-from app.models.project import Project
+from app.models.mixins.created_model_by_user_mixin import CreatedModelByUserMixin
 
 
 class BasePermission(ABC):
@@ -29,6 +29,13 @@ class IsAuthenticated(BasePermission):
 
     async def has_permission(self, user: User) -> bool:
         return user is not None
+
+
+class IsAllowOwner(BasePermission):
+    async def has_permission(self, user: User, obj: CreatedModelByUserMixin) -> bool:
+        if user is None or obj is None:
+            return False
+        return getattr(obj, "owner", None) == user
 
 
 class PermissionChecker:
