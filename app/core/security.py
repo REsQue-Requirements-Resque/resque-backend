@@ -10,7 +10,8 @@ from sqlalchemy.future import select
 
 from app.core.config import settings
 from app.db.base import AsyncSession, get_async_db
-from app.models import LoginAttempt, User
+from app.models.user import User
+from app.models.login_attempt import LoginAttempt
 from app.schemas.user import UserResponse
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 # OAuth2PasswordBearer 정의
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+def get_user_model():
+    return User
 
 
 def get_password_hash(password: str) -> str:
@@ -134,3 +139,13 @@ async def clear_login_attempts(email: str, db: AsyncSession):
     await db.execute(delete_stmt)
     await db.commit()
     logger.info(f"Cleared all login attempts for {email} after successful login")
+
+
+async def get_current_user_id(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    email = verify_token(token, credentials_exception)
+    return email
