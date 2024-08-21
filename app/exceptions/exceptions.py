@@ -8,3 +8,9 @@ class PageNotFound(Exception):
     def __init__(self, message: str = "Page not found"):
         self.message = message
         super().__init__(self.message)
+
+
+class DatabaseError(Exception):
+    def __init__(self, message: str = "Database error"):
+        self.message = message
+        super().__init__(self.message)
