@@ -53,7 +53,9 @@ class AuthenticationService:
         self, email: str, password: str, current_time: datetime
     ) -> Optional[User]:
         if not await self.check_login_attempts(email, current_time):
-            raise TooManyAttemptsError("로그인 시도가 너무 많습니다. 나중에 다시 시도해 주세요.")
+            raise TooManyAttemptsError(
+                "로그인 시도가 너무 많습니다. 나중에 다시 시도해 주세요."
+            )
 
         # 사용자 인증 로직...
         user = await self.db_session.execute(select(User).where(User.email == email))
@@ -93,3 +95,7 @@ class AuthenticationService:
         except Exception as e:
             await self.db_session.rollback()
             raise DatabaseError(f"Error resetting login attempts: {str(e)}")
+
+
+def get_current_user():
+    pass
