@@ -1,101 +1,61 @@
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from fastapi import HTTPException, status
+from jose import JWTError, jwt
+from app.core.config import settings
+from app.schemas.token import TokenData
+from app.repositories.user_repository import UserRepository
+import logging
 
-from pydantic import ValidationError
-from sqlalchemy import delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.security import verify_password
-from app.exceptions.user_exceptions import (
-    DatabaseError,
-    InvalidCredentialsError,
-    TooManyAttemptsError,
-)
-from app.models import LoginAttempt, User
-from app.schemas.user import UserLogin
+logger = logging.getLogger(__name__)
 
 
 class AuthenticationService:
-    def __init__(self, db_session: AsyncSession):
-        self.db_session = db_session
-        self.login_attempts = {}
-        self.max_attempts = 5
-        self.cooldown_period = timedelta(minutes=5)
+    def __init__(self, user_repository: UserRepository):
+        self.user_repository = user_repository
 
-    async def check_login_attempts(self, email: str, current_time: datetime) -> bool:
-        # 쿨다운 기간이 지난 로그인 시도 삭제
-        delete_query = delete(LoginAttempt).where(
-            LoginAttempt.email == email,
-            LoginAttempt.attempt_time <= current_time - self.cooldown_period,
-        )
-        await self.db_session.execute(delete_query)
-        await self.db_session.commit()
-
-        # 최근 5분 동안의 로그인 시도 횟수 조회
-        query = select(func.count(LoginAttempt.id)).where(
-            LoginAttempt.email == email,
-            LoginAttempt.attempt_time > current_time - self.cooldown_period,
-        )
-        result = await self.db_session.execute(query)
-        attempt_count = result.scalar_one()
-
-        if attempt_count >= self.max_attempts:
-            return False
-
-        # 새로운 로그인 시도 기록
-        new_attempt = LoginAttempt(email=email, attempt_time=current_time)
-        self.db_session.add(new_attempt)
-        await self.db_session.commit()
-
-        return True
-
-    async def authenticate_user(
-        self, email: str, password: str, current_time: datetime
-    ) -> Optional[User]:
-        if not await self.check_login_attempts(email, current_time):
-            raise TooManyAttemptsError(
-                "로그인 시도가 너무 많습니다. 나중에 다시 시도해 주세요."
-            )
-
-        # 사용자 인증 로직...
-        user = await self.db_session.execute(select(User).where(User.email == email))
-        user = user.scalar_one_or_none()
-
-        if not user or not verify_password(password, user.hashed_password):
-            raise InvalidCredentialsError("잘못된 이메일 또는 비밀번호입니다.")
-
-        return user
-
-    async def get_user_by_email(self, email: str) -> Optional[User]:
+    @staticmethod
+    def decode_token(token: str) -> TokenData:
         try:
-            result = await self.db_session.execute(
-                select(User).filter(User.email == email)
+            payload = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
             )
-            return result.scalars().first()
-        except Exception as e:
-            raise DatabaseError(f"Error retrieving user: {str(e)}")
+            username: str | None = payload.get("sub")
+            if username is None:
+                raise ValueError("Username not found in token")
+            return TokenData(username=username)
+        except JWTError:
+            raise ValueError("Invalid token")
 
-    async def record_failed_attempt(self, email: str) -> None:
+    async def get_current_user(self, token: str):
         try:
-            new_attempt = LoginAttempt(
-                email=email, attempt_time=datetime.now(timezone.utc)
-            )
-            self.db_session.add(new_attempt)
-            await self.db_session.commit()
-        except Exception as e:
-            await self.db_session.rollback()
-            raise DatabaseError(f"Error recording failed attempt: {str(e)}")
+            token_data = self.decode_token(token)
+            user = await self.user_repository.get_by_username(token_data.username)
+            if user is None:
+                raise ValueError("User not found")
+            return user
+        except ValueError as e:
+            logger.error(f"Authentication failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
 
-    async def reset_login_attempts(self, email: str) -> None:
+    async def get_user(self, username: str):
         try:
-            await self.db_session.execute(
-                delete(LoginAttempt).where(LoginAttempt.email == email)
-            )
-            await self.db_session.commit()
+            user = await self.user_repository.get_by_username(username)
+            if user is None:
+                logger.info(f"User with username {username} not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User with username {username} not found",
+                )
+            return user
+        except HTTPException:
+            # Re-raise HTTP exceptions without modifying them
+            raise
         except Exception as e:
-            await self.db_session.rollback()
-            raise DatabaseError(f"Error resetting login attempts: {str(e)}")
-
-
-def get_current_user():
-    pass
+            logger.error(f"An error occurred while retrieving the user: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An error occurred while retrieving the user",
+            ) from e
