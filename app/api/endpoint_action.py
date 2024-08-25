@@ -49,7 +49,7 @@ class EndpointAction:
 
         return result
 
-    def register(self, router, prefix):
+    def register(self, router, prefix, tags=None):
         # prefix가 이미 '/'로 시작하는지 확인
         if not prefix.startswith("/"):
             prefix = f"/{prefix}"
@@ -71,8 +71,9 @@ class EndpointAction:
         router.add_api_route(
             path,
             self.execute,
-            methods=self.methods,  # 여기서 모든 메소드를 한 번에 전달
+            methods=self.methods,
             response_model=self.response_model,
             status_code=self.status_code,
             summary=self.summary,
+            tags=tags,
         )
