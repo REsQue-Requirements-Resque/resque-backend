@@ -9,7 +9,6 @@ from app.models.user import User
 
 
 class Project(BaseModel, CreatedModelByUserMixin, SoftDeleteMixin, TimestampMixin):
-    __tablename__ = "projects"
     _user_class = User
 
     title: Mapped[str] = mapped_column(String, nullable=False)
