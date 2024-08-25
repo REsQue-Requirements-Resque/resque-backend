@@ -1,30 +1,20 @@
-from datetime import datetime
-
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    ForeignKey,
-    String,
-    UniqueConstraint,
-)
-from sqlalchemy.orm import relationship
+from sqlalchemy import String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base_model import BaseModel
+from app.models.mixins.soft_delete_mixin import SoftDeleteMixin
+from app.models.mixins.timestamp_mixin import TimestampMixin
+from app.models.mixins.created_model_by_user_mixin import CreatedModelByUserMixin
+from app.models.user import User
 
 
-class Project(BaseModel):
-    founder_id = Column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    title = Column(String, index=True)
-    description = Column(String, nullable=True)
+class Project(BaseModel, CreatedModelByUserMixin, SoftDeleteMixin, TimestampMixin):
+    __tablename__ = "projects"
+    _user_class = User
 
-    is_deleted = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-
-    # Relationship
-    founder = relationship("User", back_populates="projects")
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String)
 
     __table_args__ = (
-        UniqueConstraint("title", "founder_id", name="unique_project_title"),
+        UniqueConstraint("title", "owner_id", name="unique_project_title"),
     )
