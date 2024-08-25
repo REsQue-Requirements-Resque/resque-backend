@@ -127,7 +127,7 @@ class BaseService:
         except SQLAlchemyError as e:
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    async def delete(self, id: Any) -> Optional[ResponseSchema]:
+    async def delete(self, id: Any) -> bool:
         """객체를 삭제합니다.
 
         Args:
@@ -143,6 +143,6 @@ class BaseService:
             db_obj = await self.repository.delete(id)
             if not db_obj:
                 raise HTTPException(status_code=404, detail="Object not found")
-            return self.response_schema.model_validate(db_obj)
+            return True
         except SQLAlchemyError as e:
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
