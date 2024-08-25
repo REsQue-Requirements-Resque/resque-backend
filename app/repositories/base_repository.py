@@ -40,11 +40,10 @@ class BaseRepository:
                 update(self._model_class)
                 .where(self._model_class.id == id)
                 .values(**obj_in)
-                .returning(self._model_class)
             )
-            result = await self.db_session.execute(stmt)
+            await self.db_session.execute(stmt)
             await self.db_session.commit()
-            return result.scalar_one_or_none()
+            return await self.get(id)  # 업데이트된 객체를 다시 조회
         except SQLAlchemyError as e:
             await self.db_session.rollback()
             raise
