@@ -35,6 +35,4 @@ async def db_session(async_session_maker, create_tables):
 
 
 @pytest.fixture(scope="function")
-async def client(db_session):
-    # Here you would set up your FastAPI TestClient
-    yield None
+async def client(db_session): ...
