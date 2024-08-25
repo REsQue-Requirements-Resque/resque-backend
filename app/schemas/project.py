@@ -6,7 +6,6 @@ from app.schemas.base_schema import (
     CreateSchema,
     UpdateSchema,
     ResponseSchema,
-    BaseSchema,
 )
 
 
@@ -69,9 +68,3 @@ class ProjectResponse(ProjectBase, ResponseSchema):
     founder_id: int
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class ProjectSchema(BaseSchema[ProjectCreate, ProjectUpdate, ProjectResponse]):
-    CreateSchema = ProjectCreate
-    UpdateSchema = ProjectUpdate
-    ResponseSchema = ProjectResponse
