@@ -34,6 +34,8 @@ class BaseCrudEndpoint:
         self.register_custom_actions()
 
     def register_default_routes(self):
+        item_name = self.prefix.rstrip("s").lstrip("/")
+
         base_actions = {
             "create": EndpointAction(
                 func=self.create,
@@ -42,7 +44,7 @@ class BaseCrudEndpoint:
                 response_model=self.response_schema,
                 status_code=status.HTTP_201_CREATED,
                 permissions=[IsAuthenticated],
-                summary="Create a new item",
+                summary=f"Create new {item_name}",
             ),
             "list": EndpointAction(
                 func=self.list,
@@ -50,7 +52,7 @@ class BaseCrudEndpoint:
                 is_detail=False,
                 response_model=PaginatedResponse[self.response_schema],
                 permissions=[IsAuthenticated],
-                summary="List all items",
+                summary=f"List all {item_name}s",
             ),
             "retrieve": EndpointAction(
                 func=self.retrieve,
@@ -58,7 +60,7 @@ class BaseCrudEndpoint:
                 is_detail=True,
                 response_model=self.response_schema,
                 permissions=[IsAuthenticated],
-                summary="Retrieve a specific item",
+                summary=f"Retrieve specific {item_name}",
             ),
             "update": EndpointAction(
                 func=self.update,
@@ -66,7 +68,7 @@ class BaseCrudEndpoint:
                 is_detail=True,
                 response_model=self.response_schema,
                 permissions=[IsAuthenticated, IsAllowOwner],
-                summary="Update an item",
+                summary=f"Update {item_name}",
             ),
             "delete": EndpointAction(
                 func=self.delete,
@@ -74,12 +76,12 @@ class BaseCrudEndpoint:
                 is_detail=True,
                 status_code=status.HTTP_204_NO_CONTENT,
                 permissions=[IsAuthenticated, IsAllowOwner],
-                summary="Delete an item",
+                summary=f"Delete {item_name}",
             ),
         }
 
         for action_name, action in base_actions.items():
-            action.register(self.router, self.prefix)
+            action.register(self.router, self.prefix, self.tags)
 
     def register_custom_actions(self):
         pass
